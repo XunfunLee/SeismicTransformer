@@ -25,8 +25,6 @@ parser.add_argument('--plot', type=bool, default=False, help='plot the loss and 
 # run the parser parameters
 args = parser.parse_args()
 
-# python SeT_Main.py --patch_size 250 --epoch 5
-
 ###### -------------------------------------------------------------- ######
 
 ###### ---------------------- Hyper-Parameters ---------------------- ######

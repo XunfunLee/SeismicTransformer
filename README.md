@@ -69,11 +69,15 @@ python SeT_Train_Factory.py
 
 ### Stage 1: Seismic Transformer V1.0
 
-**Stage 1.1**: Build Seismic Transformer on the fundation of Vision Transformer. Using *@Jie Zheng*'s data to train the based model using ground motion time-seris data. (100% completed by *@Jason Jiang*)
+**Stage 1.1**: Build Seismic Transformer on the fundation of Vision Transformer. Using *@Jie Zheng*'s data to train the based model using ground motion time-seris data. (100%)
 
-**Stage 1.2**: Modularization from notebook to python scripts. Automation by args in single line. (90% completed by *@Jason Jiang*)
+**Stage 1.2**: Modularization from notebook to python scripts. Automation by args in single line. (90%)
 
-**Stage 1.3**: Ploting attention weights, positional embedding to see the model's performance. Setup learning rate warmup, caculating F1 score, recall. (80% completed by *@Jason Jiang*)
+**Stage 1.3**: Ploting attention weights, positional embedding to see the model's performance. Setup learning rate warmup, caculating F1 score, recall. (80%)
+
+### Stage 2: Seismic Transformer V2.0
+
+on coming...
 
 
 

@@ -1,0 +1,9 @@
+# torch
+torchvision
+torchinfo
+h5py
+seaborn
+matplotlib
+mlxtend
+tqdm
+sklearn

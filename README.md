@@ -21,7 +21,7 @@ First you need to install pytorch for your nividia GPU *(if you are using MacOS,
 ### 2.1 Folder directory
 
 #### Seisimic-Transformer(this project)
-- Data: contain the time-series data of ground motions and buidling damage state. More infomation of the data is in the readme.md under "Data" folder.
+- Data: contain the time-series data of ground motions and buidling damage state. More infomation of the data is in the readme.md under "Data" folder. These data file can be seen in NAS"Z:\public folder\2020ZJ\xxx".
 - PythonScripts: python script for modularization of transformer.
   - `data_preparation.py`: load data, create dataloader...
   - `embedding.py`: patch embedding, projection...
@@ -45,7 +45,7 @@ This is a python notebook for the beginner to learn transformer architecture. Th
 
 #### `SeT_Modular.ipynb` (**Step 2**): for **master** to know how transformer works after modularization
 
-This notebook is an upgrade of `SeT_Base.ipynb`, putting all functions, classes into python scripts by modularization, getting ready for training within one line of code.
+This notebook is an upgrade of `SeT_Base.ipynb`, putting all functions, classes into python scripts by modularization, getting ready for training within one line of code. But it can't work due to the change of the python scripts.
 
 #### `SeT_Train.py` (**Step 3**): for **professor** to train your model in a single command line
 
@@ -63,15 +63,17 @@ A modular and automatic scripts to run batches of training, define different par
 python SeT_Train_Factory.py
 ```
 
-`batch_size`: according to your GPU VRAM, for `RTX-3090ti-24G`, can reach 1972 `batch_size` max (with a HIDDEN_SIZE = 768, NUM_LAYER = NUM_HEAD = 12, parmas of the model is 86M). Big model with more params require more VRAM.
+`batch_size`: according to your GPU VRAM, for `RTX-3090ti-24G`, can reach 1972 `batch_size` max (with a `HIDDEN_SIZE` = 768, `NUM_LAYER` = `NUM_HEAD` = 12, parmas of the model is 86M). Big model with more params require more VRAM.
 
 ## 3. About this version
 
 ### Stage 1: Seismic Transformer V1.0
 
-**Stage 1.1**: *@Jason Jiang* build Seismic Transformer on the fundation of Vision Transformer. Using *@Jie Zheng*'s data to train the based model using ground motion time-seris data.
+**Stage 1.1**: Build Seismic Transformer on the fundation of Vision Transformer. Using *@Jie Zheng*'s data to train the based model using ground motion time-seris data. (100% completed by *@Jason Jiang*)
 
-**Stage 1.2**: Modularization and automation complete in this stage by *@Jason Jiang*.
+**Stage 1.2**: Modularization from notebook to python scripts. Automation by args in single line. (90% completed by *@Jason Jiang*)
+
+**Stage 1.3**: Ploting attention weights, positional embedding to see the model's performance. Setup learning rate warmup, caculating F1 score, recall. (80% completed by *@Jason Jiang*)
 
 
 

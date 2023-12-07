@@ -4,6 +4,8 @@
 
 *Date: 2023.12.3*
 
+![0b042aafb6ba0395805a07402df2c27](https://github.com/XunfunLee/SeismicTransformer/assets/129706253/ffffd3d4-a447-4761-a73c-c7156d097218)
+
 ## 1. Get preparation
 
 First you need to install pytorch for your nividia GPU *(if you are using MacOS, go to https://pytorch.org for pytorch for mps)* and create a virtual environment to install dependencies.

@@ -26,6 +26,8 @@ class MultiheadSelfAttentionBlock(nn.Module):
         # Create the Norm layer (LN)
         self.layer_norm = nn.LayerNorm(normalized_shape=embedding_dim)
         
+        self.num_heads = num_heads
+
         # Create the Multi-Head Attention (MSA) layer
         self.multihead_attn = nn.MultiheadAttention(embed_dim=embedding_dim,
                                                     num_heads=num_heads,
@@ -33,12 +35,32 @@ class MultiheadSelfAttentionBlock(nn.Module):
                                                     batch_first=True) # does our batch dimension come first?
         
     # Create a forward() method to pass the data throguh the layers
-    def forward(self, x):
+    def forward(self, x, mask=None):
+
         x = self.layer_norm(x)
+
+        if mask is not None:
+            # We expand on the sequence dimension to create [batch_size, seq_len, seq_len]
+            # `mask` is expanded to match the shape required for `attn_mask` in MultiheadAttention
+            # `unsqueeze(1)` adds a singleton dimension at index 1
+            # `expand` repeats the tensor across the new dimension to match `seq_len`
+            extended_mask = mask.unsqueeze(1).expand(-1, x.size(1), -1)
+            # Since `attn_mask` expects a mask that has 0 for tokens to include and float('-inf') for tokens to exclude,
+            # we convert our boolean mask to float tensor, where True values will be set to float('-inf').
+            extended_mask = extended_mask.float().masked_fill(extended_mask, float('-inf'))
+            # We need to replicate the mask for each head. This gives us the proper broadcast shape.
+            extended_mask = extended_mask.repeat_interleave(self.num_heads, dim=0)
+            # Turn the mask into a list, not torch(user warning: Prefer to use a boolean mask directly.)
+
+            # the final mask shape is [batch_size * num_heads, seq_len, seq_len]   e.g. [23664, 13, 13]    23664 = 1972 * 12
+        else:
+            extended_mask = None
+
         attn_output, attn_weights = self.multihead_attn(query=x, # query embeddings 
-                                             key=x, # key embeddings
-                                             value=x, # value embeddings
-                                             need_weights=True) # do we need the weights or just the layer outputs? Yes, we need!
+                                                        key=x, # key embeddings
+                                                        value=x, # value embeddings
+                                                        attn_mask=extended_mask, # attention mask
+                                                        need_weights=True) # do we need the weights or just the layer outputs? Yes, we need!
         return attn_output, attn_weights
 
     def summary(self,
@@ -132,10 +154,9 @@ class TransformerEncoderBlock(nn.Module):
                                                     dropout=mlp_dropout)
         
     # Create a forward() method
-    def forward(self, x):
-        
+    def forward(self, x, mask=None):
         # Output the attention_weight of the MAS block to see how the model is learning
-        mas_output, attn_weights = self.msa_block(x)
+        mas_output, attn_weights = self.msa_block(x, mask=mask)
 
         # Create residual connection for MSA block (add the input to the output)
         x = mas_output + x
@@ -224,7 +245,7 @@ class SeismicTransformer(nn.Module):
         )
     
     # Create a forward() method
-    def forward(self, x):
+    def forward(self, x, mask=None):
 
         # clear the attention weights list
         self.attention_weights_list = []
@@ -253,7 +274,7 @@ class SeismicTransformer(nn.Module):
         # Pass patch, position and class embedding through transformer encoder layers (equations 2 & 3 in ViT)
         # Adding a function to collect the attn_weights of the last encoder layer
         for layer in self.transformer_encoder:
-            x, attn_weights = layer(x)
+            x, attn_weights = layer(x, mask=mask)
             self.attention_weights_list.append(attn_weights)
         # suppose a list have: num_of_layer * [batch_size, num_of_patch+1, num_of_patch+1]
         # len(self.attention_weights_list) = num_of_layer

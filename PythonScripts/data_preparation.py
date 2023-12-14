@@ -13,8 +13,7 @@ import os
 import numpy as np
 import h5py
 import torch
-from torch.utils.data import DataLoader, TensorDataset, Dataset, random_split
-from torch.utils.data.dataset import ConcatDataset
+from torch.utils.data import DataLoader, Dataset, random_split
 from typing import List, Tuple
 
 # 1. Load data from matlab(.mat format)
@@ -69,7 +68,7 @@ def H5pyToTensor(
     traindata_path: str,
     valdata_path: str,
     testdata_path: str,
-    transpose:bool=True) -> np.ndarray:
+    transpose:bool=True) -> torch.Tensor:
     """Process .mat data. Read file(h5py) and transpose(numpy)
 
     Args:
@@ -107,8 +106,10 @@ def H5pyToTensor(
 
     train_gm_recs = torch.from_numpy(train_gm_recs)
     train_labels = torch.from_numpy(train_labels)
+    
     val_gm_recs = torch.from_numpy(val_gm_recs)
     val_labels = torch.from_numpy(val_labels)
+
     test_gm_recs = torch.from_numpy(test_gm_recs)
     test_labels = torch.from_numpy(test_labels)
 
@@ -124,9 +125,128 @@ def H5pyToTensor(
 
     return train_gm_recs, train_labels, val_gm_recs, val_labels, test_gm_recs, test_labels
 
+def MaskingDataFake(input_array: np.ndarray) -> np.ndarray:
+    """ Masking Fake data for comparation, this function is not used in the model
+        just want to compare the performance of the model with and without masking
+
+    Args:
+    input_array: numpy array
+    
+    Returns:
+    masked numpy array, e.g. [-1e9, -1e9, -1e9, -1e9, 0, 0, 0, 0, 0, 0, 0, 0, 0] size=(12,1)
+    """
+    mask = np.zeros_like(input_array)
+    return mask
+
+def MaskingData(input_array: np.ndarray,
+                min_length:int=250,
+                factor:int=50) -> np.ndarray:
+    """Mask the data which is padding by 0 to match the exact size of the input of the model.
+
+    We are setting a series of rule to decide whether a point is padding points, not for 0 padding only.
+    If there are more than 250 constant points which values are less than 1/50 of the peak acceleration of the curve, we assume it is padding.
+    Further more, padding won't exist in the middle of the ground motion, it must to be in the start or the end of the ground motion record.
+
+    Args:
+    input_array: numpy array
+    min_length: the minimum length of the sequence
+    factor: the factor of the threshold value
+    
+    Returns:
+    masked numpy array, e.g. [-1e9, -1e9, -1e9, -1e9, 0, 0, 0, 0, 0, 0, 0, 0, 0] size=(12,1)
+    """
+    mask = np.zeros_like(input_array)
+    _, sample_length = input_array.shape
+
+    for i, row in enumerate(input_array):
+        # Caculate the max value of the current sequence as the threshold value
+        threshold_value = np.max(np.abs(row)) / factor
+
+        # Check the start of the sequence
+        start_count = 0
+        while start_count < sample_length and abs(row[start_count]) < threshold_value:
+            start_count += 1
+
+        # if the start of the sequence is long enough, mask it
+        if start_count >= min_length:
+            mask[i, :start_count] = -1e9
+
+        # Check the end of the sequence
+        end_count = 0
+        while end_count < sample_length and abs(row[sample_length - end_count - 1]) < threshold_value:
+            end_count += 1
+
+        # if the end of the sequence is long enough, mask it
+        if end_count >= min_length:
+            mask[i, sample_length - end_count:] = -1e9
+
+    return mask
+
+def TransformMaskData(mask_data: np.ndarray,
+                      num_of_patch:int=12,
+                      patch_size:int=250) -> torch.Tensor:
+
+    """ Split the mask like the gm to patches and add class token           [num_of_mask, 3000] --> [num_of_mask, 13]
+        
+        e.g. 3000 // 12 = 250, length of each mask is 250, but not all patches is padding.
+        So we are using some math to count the padding point inside each patch,
+        if the number of padding point is greater than useful points, then this patch is considered to be padding.
+
+        Turning padding patch --> True, useful patch --> False, for the purpose of the `attn_weights` in Multi-head Attention Block
+
+    Args:
+        origin_mask: the mask data list             e.g. [60940, 3000]
+        num_of_patch: the number of patch
+        patch_size: the size of the patch
+
+    Returns:
+
+    """
+    # Ensure mask_data length is 3000
+    if mask_data.shape[1] != num_of_patch * patch_size:
+        raise ValueError(f"Expected each mask data row to be of length {num_of_patch * patch_size},"
+                         f" but got {mask_data.shape[1]}")
+
+    # Define the chunk size as the total length divided by 12
+    segment_size = patch_size
+
+    # Initialize the results list
+    results = []
+
+    # Process each mask_data entry (each row in mask_data)
+    for mask in mask_data:
+        # 初始化一个布尔数组，用于存放每个分段的结果
+        segment_results = np.zeros(num_of_patch, dtype=bool)
+
+        # Split mask data into num_of_patch chunks and process each chunk
+        for i in range(num_of_patch):
+            start_idx = i * segment_size
+            end_idx = start_idx + segment_size
+            segment = mask[start_idx:end_idx]
+
+            # 计算0和-1e9的数量
+            num_zeros = np.sum(segment == 0)
+            num_neg_inf = np.sum(segment == -1e9)
+
+            # 根据数量多少设置结果
+            segment_results[i] = num_zeros < num_neg_inf
+
+        # Convert the row_result list to a PyTorch tensor and append to results
+        attn_weights_mask_1D = torch.tensor(segment_results, dtype=torch.bool)
+        # Add class token mask and attn_weigths_mask to match the input length of sequence
+        # If we adding Frecrency and Structural propetries in front of the class token, we need to add more dimension here for padding.
+        class_token_mask = torch.zeros(1, dtype=torch.bool)
+        attn_weights_mask_with_classtoken_1D = torch.cat((class_token_mask, attn_weights_mask_1D), dim=0)
+        results.append(attn_weights_mask_with_classtoken_1D)
+
+    # here our output is 1D mask while the model need 2D input, we scale the dimension inside the multi-head attention forward function to save the memory
+    return torch.stack(results)
+
+
 # 3. Put data into dataloader, also from numpy array to tensor
 def CreateDataLoader(input_data:torch.Tensor, 
-                     labels:torch.Tensor, 
+                     labels:torch.Tensor,
+                     mask:torch.Tensor,
                      batch_size:int) -> DataLoader:
     """Create a dataloader to manage the data
 
@@ -138,26 +258,40 @@ def CreateDataLoader(input_data:torch.Tensor,
     Returns:
     torch.utils.data.DataLoader(class): can shuffle the data, load data in loop
     """
-    dataset = TensorDataset(input_data, labels)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    dataset = DataLabelMaskDataset(input_data, labels, mask)
+    dataloader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
     return dataloader
 
-# 4. Create a custom dataset to split the training and validation dataset
-class CustomTensorDataset(Dataset):
-    """Custom dataset"""
-    def __init__(self, tensors):
-        self.tensors = tensors
+# 4. Create a custom dataset: store the ground motion data, label, and mask
+class DataLabelMaskDataset(Dataset):
+    """Custom dataset
+    data: [n_samples, length_of_gm, 1]   e.g. [60940, 3000, 1]
+    labels: [n_samples]                  e.g. [60940]
+    masks: [n_samples, length_of_gm]     e.g. [60940, 3000]
+
+    In fact, what this custom dataset do is just unsqueeze the mask data, comparing to th TensorDataset class
+    """
+    def __init__(self, data, labels, masks):
+        self.data = data
+        self.labels = labels
+        self.masks = masks
 
     def __len__(self):
-        return len(self.tensors[0])
+        return len(self.data)
 
-    def __getitem__(self, index):
-        x = self.tensors[0][index]
-        y = self.tensors[1][index]
-        return x, y
+    def __getitem__(self, idx):
+        data = self.data[idx]
+        label = self.labels[idx]
+        mask = self.masks[idx]
+        # mask need to add one dimension to adjust the multihead attention
+        # len(attn_mask) should equal to 3000
+        # mask [3000] -> [1, 3000]
+        mask = mask.unsqueeze(0)
+        return data, label, mask
 
 def CreateDataLoadersWithMultiDataset(data_list:List[torch.Tensor],
                                     label_list:List[torch.Tensor], 
+                                    mask_list:List[torch.Tensor],
                                     train_ratio:float=0.8, 
                                     batch_size:int=64) -> Tuple[DataLoader, DataLoader]:
     """ Merge multi dataset and label and split them into train and validation set
@@ -165,6 +299,7 @@ def CreateDataLoadersWithMultiDataset(data_list:List[torch.Tensor],
     Args:
         data_list: [n_samples, length_of_gm, 1]   e.g. [60940, 3000, 1]
         label_list: [n_samples]
+        mask_list: [n_samples, length_of_gm]     e.g. [60940, 3000]
         train_ratio: ratio of training data of the whole dataset
         batch_size: batch size
 
@@ -174,9 +309,10 @@ def CreateDataLoadersWithMultiDataset(data_list:List[torch.Tensor],
     # merge all dataset in dataset list
     all_data = torch.cat(data_list, dim=0)
     all_labels = torch.cat(label_list, dim=0)
+    all_masks = torch.cat(mask_list, dim=0)
 
     # create CustomTensorDataset instance
-    combined_dataset = CustomTensorDataset((all_data, all_labels))
+    combined_dataset = DataLabelMaskDataset(all_data, all_labels, all_masks)
 
     # calculate the size of training dataset
     train_size = int(train_ratio * len(combined_dataset))
@@ -191,9 +327,7 @@ def CreateDataLoadersWithMultiDataset(data_list:List[torch.Tensor],
 
     # create dataLoader
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=False)
-
-
+    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=True)
 
     return train_dataloader, validation_dataloader
 

@@ -11,7 +11,7 @@ import subprocess
 # num_layer = num_head = 12 is better for 100k traning data, bigger model won't increase the performance
 # learning_rate=0.001(bigger loss will become nan); weight_decay=0.0(bigger acc will decrease); lr_decay=0.1/0.2(very similar)
 params_list = [
-    # {'patch_size': 250, 'hidden_size': 768, 'num_layer': 12, 'num_head': 12, 'batch_size': 1972, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},        # lr decay = 0.2
+    {'patch_size': 250, 'hidden_size': 768, 'num_layer': 4, 'num_head': 12, 'batch_size': 1972, 'epoch': 1, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1},        # lr decay = 0.2
 ]
 
 # run each of the params
@@ -28,7 +28,6 @@ for params in params_list:
         '--learning_rate', str(params['learning_rate']),
         '--weight_decay', str(params['weight_decay']),
         '--mlp_dropout', str(params['mlp_dropout']),        
-        '--plot', str(params['mlp_dropout']),
     ]
 
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)

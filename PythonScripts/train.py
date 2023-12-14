@@ -14,15 +14,21 @@ from tqdm.auto import tqdm
 from typing import Dict, List, Tuple
 import torch
 import numpy as np
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, recall_score
 import math
 from .utility import LogEpochData
 
+# define the global step, make sure the warmup step only happen once
+global_step = 0
+warmup_done = False
+
 # 1. train.step()
 def train_step(model: torch.nn.Module, 
-               dataloader: torch.utils.data.DataLoader, 
+               dataloader: torch.utils.data.DataLoader,
                loss_fn: torch.nn.Module, 
                optimizer: torch.optim.Optimizer,
+               lr_scheduler_warmup: torch.optim.lr_scheduler.LambdaLR,
+               num_warmup_steps: int,
                device: torch.device) -> Tuple[float, float]:
     """ train loop for each epoch
 
@@ -37,6 +43,9 @@ def train_step(model: torch.nn.Module,
         train_loss: loss value of the training dataset
         train_acc: accuracy of the training dataset
     """
+    # global variable
+    global global_step, warmup_done  # global_step is used for lr_scheduler_warmup
+
     # Put model in train mode
     model.train()
 
@@ -44,12 +53,18 @@ def train_step(model: torch.nn.Module,
     train_loss, train_acc = 0, 0
 
     # Loop through data loader data batches
-    for batch, (X, y) in enumerate(dataloader):
+    for batch, (X, y, Mask) in enumerate(dataloader):
         # Send data to target device, always GPU
-        X, y = X.to(device), y.to(device)
+
+        # Mask.shape = [batch_size, 1, seq_len]     e.g. [64, 1, 13]  --> [64, 13]
+        # [batch_size, 1, seq_len] --> [batch_size, seq_len] to 2D
+        # pytorch will due with the 2D to 4D automatically
+        Mask = Mask.squeeze(1)
+
+        X, y, Mask = X.to(device), y.to(device), Mask.to(device)
 
         # Forward pass
-        y_pred = model(X)
+        y_pred = model(X, mask=Mask)
 
         # Calculate  and accumulate loss
         loss = loss_fn(y_pred, y)
@@ -64,6 +79,14 @@ def train_step(model: torch.nn.Module,
         # Optimizer step
         optimizer.step()
 
+        # Step up the learning rate scheduler, warmup strategy
+        lr_scheduler_warmup.step()
+        global_step += 1
+
+        # print something after warmup
+        if not warmup_done and global_step >= num_warmup_steps:
+            print(f"Warmup completed at step {global_step}")
+            warmup_done = True  # incase print twice
 
         # if loss = nan, break the training
         if torch.isnan(loss):
@@ -105,12 +128,17 @@ def validation_step(model: torch.nn.Module,
     # Turn on inference context manager
     with torch.inference_mode():
         # Loop through DataLoader batches
-        for batch, (X, y) in enumerate(dataloader):
+        for batch, (X, y, Mask) in enumerate(dataloader):
             # Send data to target device
-            X, y = X.to(device), y.to(device)
+            # Mask.shape = [batch_size, 1, seq_len]     e.g. [64, 1, 13]  --> [64, 13]
+            # [batch_size, 1, seq_len] --> [batch_size, seq_len] to 2D
+            # pytorch will due with the 2D to 4D automatically
+            Mask = Mask.squeeze(1)
+
+            X, y, Mask = X.to(device), y.to(device), Mask.to(device)
 
             # 1. Forward pass
-            validation_pred_logits = model(X)
+            validation_pred_logits = model(X, mask=Mask)
 
             # 2. Calculate and accumulate loss
             loss = loss_fn(validation_pred_logits, y)
@@ -132,7 +160,9 @@ def train(model: torch.nn.Module,
           optimizer: torch.optim.Optimizer,
           loss_fn: torch.nn.Module,
           epochs: int,
-          lr_scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau,
+          lr_scheduler_warmup: torch.optim.lr_scheduler.LambdaLR,
+          num_warmup_steps: int,
+          lr_scheduler_decay: torch.optim.lr_scheduler.ReduceLROnPlateau,
           device: torch.device,
           log_filename: str) -> Dict[str, List]:
     """ whole action(train + validate) for each epoch
@@ -171,6 +201,8 @@ def train(model: torch.nn.Module,
                                           dataloader=train_dataloader,
                                           loss_fn=loss_fn,
                                           optimizer=optimizer,
+                                          lr_scheduler_warmup=lr_scheduler_warmup,
+                                          num_warmup_steps=num_warmup_steps,
                                           device=device)
         # if train loss = nan, break
         if math.isnan(train_loss):
@@ -191,7 +223,7 @@ def train(model: torch.nn.Module,
             break
 
         # put validation_loss to lr_scheduler
-        lr_scheduler.step(validation_loss)
+        lr_scheduler_decay.step(validation_loss)
 
         # update log file(csv file)
         LogEpochData(epoch=epoch,
@@ -245,23 +277,30 @@ def test(model: torch.nn.Module,
     y_preds = []
     y_trues = []
 
-    with torch.inference_mode():  # Disable gradient computation for evaluation
-        for X_batch, y_batch in tqdm(dataloader, desc="Evaluating"):
-            X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+    with torch.inference_mode():
+        # Loop through DataLoader batches
+        for batch, (X, y, Mask) in enumerate(dataloader):
+            # Send data to target device
+            # Mask.shape = [batch_size, 1, seq_len]     e.g. [64, 1, 13]  --> [64, 13]
+            # [batch_size, 1, seq_len] --> [batch_size, seq_len] to 2D
+            # pytorch will due with the 2D to 4D automatically
+            Mask = Mask.squeeze(1)
+
+            X, y, Mask = X.to(device), y.to(device), Mask.to(device)
 
             # Forward pass
-            y_logit = model(X_batch)
+            y_logit = model(X, mask=Mask)
 
             # Predictions
             _, predicted_labels = torch.max(y_logit, 1)
 
-            # Count correct predictions
-            correct_preds += (predicted_labels == y_batch).sum().item()
-            total_preds += y_batch.size(0)
+             # Count correct predictions
+            correct_preds += (predicted_labels == y).sum().item()
+            total_preds += y.size(0)
 
             # Save predictions and actual labels for metrics calculations
             y_preds.append(predicted_labels.cpu())
-            y_trues.append(y_batch.cpu())
+            y_trues.append(y.cpu())
 
     # Convert predictions and actual labels from list to single tensor
     y_pred_tensor = torch.cat(y_preds)
@@ -278,10 +317,14 @@ def test(model: torch.nn.Module,
     # for multi-class classification use 'micro', 'macro', or 'weighted'
     f1 = f1_score(y_true_numpy, y_pred_numpy, average='micro')
 
+    # Caculate Recall_Score for classification task
+    Rs = recall_score(y_true_numpy, y_pred_numpy, average='micro')
+
     # Build the results dictionary
     results = {
         'test_accuracy': test_accuracy,
-        'f1_score': f1
+        'f1_score': f1,
+        'recall_score': Rs,
     }
 
     # Return results and prediction values

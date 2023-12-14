@@ -170,7 +170,8 @@ def RecordResults(GM: str,
                   mlp_dropout: float,
                   train_acc: float,
                   validation_acc: float,
-                  f1_score: float, 
+                  f1_score: float,
+                  recall_score: float,
                   times: float):
     """ save the results and information of the model into a csv file
 
@@ -183,10 +184,11 @@ def RecordResults(GM: str,
     # Define fieldnames for CSV
     fieldnames = ['No', 'Date', 'GM', 'patch_size', 'hidden_size', 'num_of_layer', 'num_of_head',
                   'num_of_epoch', 'batch_size', 'learning_rate', 'weight_decay', 'mlp_dropout', 
-                  'train_acc', 'validation_acc', 'f1_score', 'times']
+                  'train_acc', 'validation_acc', 'f1_score', 'recall_score','times']
 
     # take 4 of the number
     f1_score = round(float(f1_score), 4)
+    recall_score = round(float(recall_score), 4)
     train_acc = round(float(train_acc[-1]), 4)
     validation_acc = round(float(validation_acc[-1]), 4)
 
@@ -225,6 +227,7 @@ def RecordResults(GM: str,
             'train_acc': train_acc,
             'validation_acc': validation_acc,
             'f1_score': f1_score,
+            'recall_score': recall_score,
             "times": times
         })
 

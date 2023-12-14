@@ -1,11 +1,13 @@
 """
 Contains functionality for visualization.
-1. Plot the ground motion time series data.
-2. Plot the loss curvers of training.
-3. Plot the ground motion pieces after patching.
-4. Plot the confusion matrix.
-5. Plot the heat map of attention of the model.
-6. Plot the heat map of the positional encoding of the model.
+1. Plot the ground motion time series data. (test only)
+2. Save the loss curvers of training.
+3. Plot the ground motion pieces after patching.   (test only)
+4. Save the confusion matrix.
+5. Save the heat map of attention of the model.(without bar chart)
+5.1 Save the heat map of attention of the model.(with bar chart)
+6. Save the heat map of the positional embedding.
+7. Save the heat map of the positional embedding similarity.
 
 Author: Jason Jiang (Xunfun Lee)
 Date: 2023.11.30
@@ -19,12 +21,15 @@ from typing import Dict, List
 from sklearn.metrics import confusion_matrix
 import os
 import torch.nn.functional as F
+import torch
 
 # 1. Plot the ground motion time series data
 # 1.1 subplot for each ground motion
 def PlotSubplot(gm_timeseries_array:np.ndarray,
                 times:list,
-                gm_index:int):
+                gm_index:int,
+                fontsize:int=15,
+                titlesize:int=18):
     """Plot GM subplot
 
     Plot each ground motion time series data.
@@ -38,11 +43,16 @@ def PlotSubplot(gm_timeseries_array:np.ndarray,
     0
 
     """
+    plt.rcParams['font.family'] = 'Times New Roman'
     plt.figure(figsize=(15, 5))
     plt.plot(times, gm_timeseries_array[gm_index], marker='o', linestyle='-')
-    plt.title('Acceleration over Time')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Acceleration (m/s^2)')
+
+    plt.title('Acceleration over Time', fontsize=titlesize)
+    plt.xlabel('Time (s)', fontsize=fontsize)
+    plt.ylabel('Acceleration (m/s^2)', fontsize=fontsize)
+    plt.yticks(rotation=0, fontsize=fontsize, fontname='Times New Roman')  # Adjust the font size as needed, rotation=0 ensures that the y-axis labels do not rotate and are horizontal
+    plt.xticks(rotation=0, fontsize=fontsize, fontname='Times New Roman')  # Adjust the font size as needed, rotation=0 ensures that the y-axis labels do not rotate and are horizontal
+    
     plt.grid(True)
     plt.legend(['Acceleration'])
     plt.show()
@@ -104,19 +114,66 @@ def PlotGM(gm_timeseries:np.ndarray):
     plt.show()
 
 # 2. Save(plot) the loss curve function
-def plot_loss_curves(results: Dict[str, List],
-                    plot_mode: bool,
-                    save_dir: str):
-    """Plots training curves of a results dictionary.
+# def SaveLossAccCurves(results: Dict[str, List],
+#                       save_dir: str,
+#                       fontsize:int=15,
+#                       titlesize:int=18):
+#     """Plots training curves of a results dictionary.
+
+#     Args:
+#         results (dict): dictionary containing list of values, e.g.
+#             {"train_loss": [...],
+#              "train_acc": [...],
+#              "validation_loss": [...],
+#              "validation_acc": [...]}
+#         save_dir: save directory
+#     """
+#     loss = results["train_loss"]
+#     validation_loss = results["validation_loss"]
+
+#     accuracy = results["train_acc"]
+#     validation_accuracy = results["validation_acc"]
+
+#     epochs = range(len(results["train_loss"]))
+
+#     plt.rcParams['font.family'] = 'Times New Roman'
+
+#     plt.figure(figsize=(15, 7))
+
+#     # Plot loss
+#     plt.subplot(1, 2, 1)
+#     plt.plot(epochs, loss, label="train_loss")
+#     plt.plot(epochs, validation_loss, label="validation_loss")
+#     plt.title("Loss", fontsize=titlesize)
+#     plt.xlabel("Epochs", fontsize=fontsize)
+#     plt.legend()
+
+#     # Plot accuracy
+#     plt.subplot(1, 2, 2)
+#     plt.plot(epochs, accuracy, label="train_accuracy")
+#     plt.plot(epochs, validation_accuracy, label="validation_accuracy")
+#     plt.title("Accuracy", fontsize=titlesize)
+#     plt.xlabel("Epochs", fontsize=fontsize)
+#     plt.legend()
+    
+#     # save the image
+#     plt.savefig(os.path.join(save_dir, "Acc_Loss_Curve.svg"), format='svg', bbox_inches='tight')
+
+def SaveLossAccCurves(results: Dict[str, List],
+                      save_dir: str,
+                      fontsize:int=15,
+                      titlesize:int=18):
+    """Plots training curves of a results dictionary and saves the resulting figure.
 
     Args:
-        results (dict): dictionary containing list of values, e.g.
+        results (dict): Dictionary containing lists of values, e.g.
             {"train_loss": [...],
              "train_acc": [...],
              "validation_loss": [...],
              "validation_acc": [...]}
-        plot_mode: if plot the image or not
-        save_dir: save directory
+        save_dir (str): Directory where to save the training curve images
+        fontsize (int): Font size for the text in the plots (default=15)
+        titlesize (int): Font size for the titles (default=18)
     """
     loss = results["train_loss"]
     validation_loss = results["validation_loss"]
@@ -124,70 +181,330 @@ def plot_loss_curves(results: Dict[str, List],
     accuracy = results["train_acc"]
     validation_accuracy = results["validation_acc"]
 
-    epochs = range(len(results["train_loss"]))
+    epochs = range(len(loss))
+
+    plt.rcParams['font.family'] = 'Times New Roman'
+    plt.rcParams['legend.fontsize'] = fontsize  # Set the legend font size
 
     plt.figure(figsize=(15, 7))
 
     # Plot loss
     plt.subplot(1, 2, 1)
-    plt.plot(epochs, loss, label="train_loss")
-    plt.plot(epochs, validation_loss, label="validation_loss")
-    plt.title("Loss")
-    plt.xlabel("Epochs")
+    plt.plot(epochs, loss, label="Train Loss")
+    plt.plot(epochs, validation_loss, label="Validation Loss")
+    plt.title("Loss", fontsize=titlesize)
+    plt.xlabel("Epochs", fontsize=fontsize)
+    plt.ylabel("Loss", fontsize=fontsize)
     plt.legend()
+    plt.tick_params(labelsize=fontsize)  # Set the tick label font size
 
     # Plot accuracy
     plt.subplot(1, 2, 2)
-    plt.plot(epochs, accuracy, label="train_accuracy")
-    plt.plot(epochs, validation_accuracy, label="validation_accuracy")
-    plt.title("Accuracy")
-    plt.xlabel("Epochs")
+    plt.plot(epochs, accuracy, label="Train Accuracy")
+    plt.plot(epochs, validation_accuracy, label="Validation Accuracy")
+    plt.title("Accuracy", fontsize=titlesize)
+    plt.xlabel("Epochs", fontsize=fontsize)
+    plt.ylabel("Accuracy", fontsize=fontsize)
     plt.legend()
-    
-    # save the image
-    plt.savefig(os.path.join(save_dir, "Acc_Loss_Curve.png"))
-    
-    # show the image
-    # if plot_mode == True:
-        # plt.show()
+    plt.tick_params(labelsize=fontsize)  # Set the tick label font size
+
+    # Ensure the save directory exists
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    # Save the image
+    plt.savefig(os.path.join(save_dir, "Acc_Loss_Curve.svg"), format='svg', bbox_inches='tight')
+    plt.close()  # Close the plot to free memory
 
 # 4. Save(plot) confusion matrix
-def PlotConfusionMatrix(y_true: np.ndarray,
+# def SaveConfusionMatrix(y_true: np.ndarray,
+#                         y_pred: np.ndarray,
+#                         class_names: list,
+#                         save_dir: str,
+#                         fontsize:int=15,
+#                         titlesize:int=18):
+#     """Plots the confusion matrix and saves it as an SVG image.
+
+#     Args:
+#         y_true: numpy array from true result
+#         y_pred: numpy array from prediction result
+#         class_names: class names for the axis ticks
+#         save_dir: directory where to save the confusion matrix image
+#         fontsize: font size for the text in the matrix (default=15)
+#         titlesize: font size for the title (default=18)
+#     """
+
+#     # Calculate the confusion matrix
+#     cm = confusion_matrix(y_true, y_pred)
+#     plt.rcParams['font.family'] = 'Times New Roman'
+
+#     # Create a figure for the heatmap
+#     plt.figure(figsize=(10, 7))
+
+#     # Draw the heatmap
+#     sns.heatmap(cm, annot=True, fmt='g', cmap='Blues',
+#                 xticklabels=class_names, yticklabels=class_names,
+#                 annot_kws={"size": fontsize})  # Set font size for annotations
+
+#     # Title and labels
+#     plt.xlabel('Predicted', fontsize=fontsize)
+#     plt.ylabel('True', fontsize=fontsize)
+#     plt.title('Confusion Matrix', fontsize=titlesize)
+
+#     # Set the font size for the axis ticks
+#     plt.xticks(fontsize=fontsize)
+#     plt.yticks(fontsize=fontsize)
+
+#     # Save the image
+#     if not os.path.exists(save_dir):
+#         os.makedirs(save_dir)
+#     plt.savefig(os.path.join(save_dir, "confusion_matrix.svg"), format='svg', bbox_inches='tight')
+#     plt.close()  # Close the plot to free memory
+def SaveConfusionMatrix(y_true: np.ndarray,
                         y_pred: np.ndarray,
                         class_names: list,
-                        plot_mode: bool,
-                        save_dir: str):
-    """Plots training curves of a results dictionary.
+                        save_dir: str,
+                        fontsize: int = 15,
+                        titlesize: int = 18):
+    """Plots the confusion matrix and saves it as an SVG image.
 
     Args:
-        y_true: numpy array from true result
-        y_pred: numpy array from prediction result
-        class_names: class name
-        plot_mode: if plot the image or not
-        save_dir: save directory
+        y_true: numpy array of true results
+        y_pred: numpy array of predicted results
+        class_names: list of class names for the axis ticks
+        save_dir: directory where to save the confusion matrix image
+        fontsize: font size for the text in the matrix (default=15)
+        titlesize: font size for the title (default=18)
     """
-    # caculate the confusion matrix
+
+    # Calculate the confusion matrix
     cm = confusion_matrix(y_true, y_pred)
 
-    # seaborn to draw confusion matrix
+    # Set the font properties
+    plt.rcParams['font.family'] = 'Times New Roman'
+
+    # Create a figure for the heatmap
     plt.figure(figsize=(10, 7))
-    sns.heatmap(cm, annot=True, fmt='g', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
 
-    # title and labels
-    plt.xlabel('Predicted')
-    plt.ylabel('True')
-    plt.title('Confusion Matrix')
+    # Draw the heatmap and store the returned Axes object
+    ax = sns.heatmap(cm, annot=True, fmt='g', cmap='Blues',
+                     xticklabels=class_names, yticklabels=class_names,
+                     annot_kws={"size": fontsize})
 
-    # save the image
-    plt.savefig(os.path.join(save_dir, "confusion_matrix.png"))
+    # Set the title and labels with the specified fontsize
+    plt.xlabel('Predicted', fontsize=fontsize)
+    plt.ylabel('True', fontsize=fontsize)
+    plt.title('Confusion Matrix', fontsize=titlesize)
 
-    # show the image
-    # if plot_mode == True:
-        # plt.show()
+    # Set the font size for the axis ticks
+    plt.xticks(fontsize=fontsize)
+    plt.yticks(fontsize=fontsize)
 
-# 5. Plot the heat map of the attention weights
-def PlotAttnHeatMap(attn_weights_list):
+    # Get the color bar object and update its tick label size
+    cbar = ax.collections[0].colorbar
+    cbar.ax.tick_params(labelsize=fontsize)
+
+    # Save the image
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    plt.savefig(os.path.join(save_dir, "confusion_matrix.svg"), format='svg', bbox_inches='tight')
+    plt.close()  # Close the plot to free memory
+
+# 5. Save the heat map of the attention weights (old)
+def SaveAttnHeatMap(model:torch.nn.Module,
+                    save_dir:str,
+                    num_of_layer:int=12,
+                    fontsize:int=15,
+                    titlesize:int=18,
+                    annot:bool=False):
+    """plot attention heat map of the model
+
+    Args:
+        model: model you want to plot
+        save_dir: save directory
+        num_of_row: number of row of the heat map
+        num_of_col: number of column of the heat map
+        figsize: size of the figure
+    """
+    # Get the number of layers in the model
+    if num_of_layer == 12:
+        num_of_row = 4
+        num_of_col = 3
+        figsize:tuple=(12, 14)
+    elif num_of_layer == 6:
+        num_of_row = 2
+        num_of_col = 3
+        figsize:tuple=(12, 7)
+    elif num_of_layer == 4:
+        num_of_row = 2
+        num_of_col = 2
+        figsize:tuple=(12, 10)
+
+    attention_weights_list = model.attention_weights_list
+    # We want to display a heatmap without the weights corresponding to the class token, which we assume is at index 0.
+    # Therefore, we select the weight matrix excluding the first row and column.
+    fig, axes = plt.subplots(nrows=num_of_row, ncols=num_of_col, figsize=figsize)  # Large figure with 2 rows and 6 columns for subplots
+
+    for layer_idx, layer_attention in enumerate(attention_weights_list):
+        # Get attention weights for all heads in the current layer and remove class token
+        # Assume there's only one head for now; if there are multiple heads, adjust accordingly.
+        attn_matrix = layer_attention[0, 1:, 1:].detach().cpu().numpy()
+
+        # Compute the subplot index; there are 6 subplots per row.
+        row_idx = layer_idx // num_of_col
+        col_idx = layer_idx % num_of_col
+
+        # Plot the heatmap on the appropriate subplot axis.
+        ax = sns.heatmap(attn_matrix, cmap='viridis', annot=annot, fmt=".2f", ax=axes[row_idx, col_idx])     # annot can decide the number of heat map
+        cbar = ax.collections[0].colorbar
+        cbar.ax.tick_params(labelsize=fontsize)
+        # Set the title for the subplot.
+        axes[row_idx, col_idx].set_title(f'Layer {layer_idx + 1}', fontsize=titlesize)
+
+        # Set axis labels
+        axes[row_idx, col_idx].set_xlabel('Input Sequence',fontsize=fontsize)
+        axes[row_idx, col_idx].set_ylabel('Input Sequence',fontsize=fontsize)
+
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
+
+    # Save the plot
+    plt.savefig(os.path.join(save_dir, "Attn_Weights.svg"), format='svg', bbox_inches='tight')
+
+# 5.1 Save the heat map of the attention weights (new)
+def SaveAttnHeatMapBarChart(model: torch.nn.Module,
+                            save_dir: str,
+                            plot_mode: str = 'single',
+                            fontsize: int = 15,
+                            titlesize: int = 18):
+    # Ensure the save directory exists
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    # Create the subdirectory 'AttentionWeights'
+    attention_weights_dir = os.path.join(save_dir, "AttentionWeights")
+    if not os.path.exists(attention_weights_dir):
+        os.makedirs(attention_weights_dir)
+
+    attention_weights_list = model.attention_weights_list
+
+
+    if plot_mode == "multiple":
+        # for dozens of evluation plot and get the first
+        trimmed_attention_matrix = [aw.squeeze(0).cpu().detach().numpy()[0, 1:, 1:] for aw in attention_weights_list]
+    elif plot_mode == "single":
+        # for only one evluation plot
+        trimmed_attention_matrix = [aw.squeeze(0).cpu().detach().numpy()[1:, 1:] for aw in attention_weights_list]
+    else:
+        raise ValueError(f"Invalid plot mode: {plot_mode}, need to be 'single' or 'multiple'")
+
+    # Set the font style
+    plt.rcParams['font.family'] = 'Times New Roman'
+
+    # Loop for all heat maps and bar charts
+    for i, aw in enumerate(trimmed_attention_matrix):
+        fig, axs = plt.subplots(1, 2, figsize=(12, 5))
+
+        # Heat map
+        heatmap = axs[0].imshow(aw, cmap='Reds', aspect='auto', vmin=0, vmax=0.5)
+        cbar = fig.colorbar(heatmap, ax=axs[0])
+        cbar.ax.tick_params(labelsize=fontsize)
+        axs[0].set_xticks(range(12))
+        axs[0].set_xticklabels(range(1, 13), fontsize=fontsize)
+        axs[0].set_yticks(range(12))
+        axs[0].set_yticklabels(range(1, 13), fontsize=fontsize)
+        axs[0].set_title(f'Layer {i+1} Attention Weights', fontsize=titlesize)
+
+        # Bar chart
+        means = aw.mean(axis=0)
+        axs[1].bar(range(1, 13), means, color='darkred')
+        axs[1].set_xticks(range(1, 13))
+        axs[1].set_xticklabels(range(1, 13), fontsize=fontsize)
+        axs[1].tick_params(axis='y', labelsize=fontsize)
+        axs[1].set_ylim(0, 0.5)
+        axs[1].set_title(f'Layer {i+1} Attention Weights Mean', fontsize=titlesize)
+
+        plt.tight_layout()
+
+        # Save each figure in the 'AttentionWeights' subdirectory
+        plt.savefig(os.path.join(attention_weights_dir, f'attention_weights_layer_{i+1}.svg'), format='svg', bbox_inches='tight')
+        plt.close()
+
+# 6. Save the heat map of the positional encoding
+def SavePosiHeadMap(model:torch.nn.Module,
+                    save_dir:str,
+                    fontsize:int=15,
+                    titlesize:int=18,
+                    figsize:tuple=(7, 5)):
+    """save positional embedding heat map of the model
+
+    Args:
+        model: model you want to plot
+        fontsize: font size of the y axis
+        figsize: size of the figure
+
+    Returns:
+        SVG
+    """
+    # get the positional embedding
+    position_embeddings = model.position_embedding.squeeze(0)
+    position_embeddings = position_embeddings.detach().cpu().numpy()
+
+    # plot the heat map
+    plt.figure(figsize=figsize)
+    heatmap = plt.imshow(position_embeddings, cmap='viridis', aspect='auto', vmin=-4, vmax=4)
     
+    # Add a color bar at the right
+    cbar = plt.colorbar(heatmap)
+    cbar.ax.tick_params(labelsize=fontsize)  # Set the font size of the color bar
 
-    # Pick the final weights to 
-    return 0
+    # Set the main title and increase the font size
+    plt.title('Position Embeddings Heatmap', fontsize=titlesize, fontname='Times New Roman')
+    
+    # Adjust the y-axis to make it easier to read
+    plt.yticks(rotation=0, fontsize=fontsize, fontname='Times New Roman')  # Adjust the font size as needed, rotation=0 ensures that the y-axis labels do not rotate and are horizontal
+    plt.xticks(rotation=0, fontsize=fontsize, fontname='Times New Roman')  # Adjust the font size as needed, rotation=0 ensures that the y-axis labels do not rotate and are horizontal
+    plt.xlabel('Embedding Dimension', fontsize=fontsize)
+    plt.ylabel('Sequence Position', fontsize=fontsize)
+
+    # Save the plot
+    plt.savefig(os.path.join(save_dir, "Position_Embedding.svg"), format='svg', bbox_inches='tight')
+
+def SavePosiSimilarity(model:torch.nn.Module,
+                        save_dir:str,
+                        fontsize:int=15,
+                        titlesize:int=18,
+                        figsize:tuple=(7, 5)):
+    """save positional embedding similarity map of the model
+
+    Args:
+        model: model you want to plot
+        fontsize: font size of the y axis
+        figsize: size of the figure
+
+    Returns:
+        SVG
+    """
+    # evaluation model
+    model.eval()
+
+    # positional embedding
+    position_embedding = model.position_embedding
+
+    # caculate the cosine similarity matrix
+    normalized_pos_embeddings = F.normalize(position_embedding.squeeze(0), p=2, dim=-1)
+    cosine_similarity_matrix = torch.mm(normalized_pos_embeddings, normalized_pos_embeddings.t()).cpu().detach().numpy()
+
+    # create heatmap
+    plt.figure(figsize=figsize)
+    plt.imshow(cosine_similarity_matrix, cmap='viridis')  # viridis theme
+    cbar = plt.colorbar()  # color bar
+    cbar.ax.tick_params(labelsize=fontsize)  # Set the fontsize of the color bar
+    # Set label and title
+    plt.xlabel('Position', fontsize=fontsize)
+    plt.ylabel('Position', fontsize=fontsize)
+    plt.title('Position Embedding Similarity', fontsize=titlesize)
+
+    plt.xticks(range(13), fontsize=fontsize)
+    plt.yticks(range(13), fontsize=fontsize)
+    plt.savefig(os.path.join(save_dir, "Position_Embedding_Similarity.svg"), format='svg')

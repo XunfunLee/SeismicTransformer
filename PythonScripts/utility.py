@@ -18,7 +18,12 @@ import csv
 from datetime import datetime
 
 def SetDevice() -> torch.device:
-    # device
+    """ Set the device for training
+
+        cuda: Nividia GPU
+        mps: apple M-chip
+        cpu: CPU
+    """
     if torch.cuda.is_available():
         device = "cuda"
         print("GPU: cuda")

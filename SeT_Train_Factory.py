@@ -12,23 +12,6 @@ import subprocess
 # learning_rate=0.001(bigger loss will become nan); weight_decay=0.0(bigger acc will decrease); lr_decay=0.1/0.2(very similar)
 params_list = [
     # {'patch_size': 250, 'hidden_size': 768, 'num_layer': 12, 'num_head': 12, 'batch_size': 1972, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},        # lr decay = 0.2
-    # {'patch_size': 250, 'hidden_size': 768, 'num_layer': 12, 'num_head': 12, 'batch_size': 1972, 'epoch': 30, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},        # lr decay = 0.2
-    # {'patch_size': 250, 'hidden_size': 768, 'num_layer': 12, 'num_head': 12, 'batch_size': 1972, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},          # lr decay = 0.1
-    # {'patch_size': 250, 'hidden_size': 768, 'num_layer': 16, 'num_head': 16, 'batch_size': 1280, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},          # lr decay = 0.1
-    # {'patch_size': 250, 'hidden_size': 384, 'num_layer': 4, 'num_head': 4, 'batch_size': 2560, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},          # lr decay = 0.1
-    # {'patch_size': 250, 'hidden_size': 384, 'num_layer': 6, 'num_head': 6, 'batch_size': 2560, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},          # lr decay = 0.1
-    # {'patch_size': 250, 'hidden_size': 384, 'num_layer': 12, 'num_head': 12, 'batch_size': 2560, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},          # lr decay = 0.1
-    # {'patch_size': 250, 'hidden_size': 768, 'num_layer': 4, 'num_head': 4, 'batch_size': 2560, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},          # lr decay = 0.1
-    # {'patch_size': 250, 'hidden_size': 768, 'num_layer': 6, 'num_head': 6, 'batch_size': 2560, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},          # lr decay = 0.1
-    # {'patch_size': 250, 'hidden_size': 768, 'num_layer': 12, 'num_head': 12, 'batch_size': 1972, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},          # lr decay = 0.1
-    # {'patch_size': 250, 'hidden_size': 768, 'num_layer': 16, 'num_head': 16, 'batch_size': 1536, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},          # lr decay = 0.1
-    # {'patch_size': 250, 'hidden_size': 768, 'num_layer': 24, 'num_head': 24, 'batch_size': 960, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},          # lr decay = 0.1
-    # {'patch_size': 250, 'hidden_size': 768, 'num_layer': 12, 'num_head': 12, 'batch_size': 1972, 'epoch': 30, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},          # lr decay = 0.1
-    {'patch_size': 250, 'hidden_size': 768, 'num_layer': 16, 'num_head': 16, 'batch_size': 1280, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},          # lr decay = 0.1
-    {'patch_size': 250, 'hidden_size': 768, 'num_layer': 24, 'num_head': 24, 'batch_size': 960, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},          # lr decay = 0.1
-    {'patch_size': 250, 'hidden_size': 768, 'num_layer': 12, 'num_head': 12, 'batch_size': 1972, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0., 'plot': False},          # lr decay = 0.1
-    {'patch_size': 250, 'hidden_size': 768, 'num_layer': 6, 'num_head': 12, 'batch_size': 1972, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},          # lr decay = 0.1
-    {'patch_size': 250, 'hidden_size': 768, 'num_layer': 12, 'num_head': 6, 'batch_size': 1972, 'epoch': 20, 'learning_rate': 0.001, 'weight_decay': 0.0, 'mlp_dropout': 0.1, 'plot': False},          # lr decay = 0.1
 ]
 
 # run each of the params
@@ -45,7 +28,7 @@ for params in params_list:
         '--learning_rate', str(params['learning_rate']),
         '--weight_decay', str(params['weight_decay']),
         '--mlp_dropout', str(params['mlp_dropout']),        
-        '--plot', str(params['mlp_dropout']),        
+        '--plot', str(params['mlp_dropout']),
     ]
 
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)

@@ -54,7 +54,7 @@ This notebook is an upgrade of `SeT_Base.ipynb`, putting all functions, classes 
 This python script contains all the process from data preparation to save the model. Functions and classes definition is under "PythonScripts" folder. Using one line of code to run:
 
 ```cmd
-python SeT_Train.py --patch_size 250 --hidden_size 384 --num_layer 4 --num_head 4 --batch_size 64 --epoch 2 --learning_rate 0.001 --weight_decay 0.1 --mlp_dropout 0.1 --plot False
+python SeT_Train.py --patch_size 250 --hidden_size 384 --num_layer 4 --num_head 4 --batch_size 64 --epoch 2 --learning_rate 0.001 --weight_decay 0.1 --mlp_dropout 0.1
 ```
 
 #### `SeT_Train_Factory.py` (**Step 4**): for **high level professor** to train multiple model in a single command line
@@ -69,13 +69,13 @@ python SeT_Train_Factory.py
 
 ## 3. About this version
 
-### Stage 1: Seismic Transformer V1.0
+### Stage 1: Seismic Transformer V1.0 (100%)
 
 **Stage 1.1**: Build Seismic Transformer on the fundation of Vision Transformer. Using *@Jie Zheng*'s data to train the based model using ground motion time-seris data. (100%)
 
-**Stage 1.2**: Modularization from notebook to python scripts. Automation by args in single line. (90%)
+**Stage 1.2**: Modularization from notebook to python scripts. Automation by args in single line. (100%)
 
-**Stage 1.3**: Ploting attention weights, positional embedding to see the model's performance. Setup learning rate warmup, caculating F1 score, recall. (80%)
+**Stage 1.3**: Ploting attention weights, positional embedding to see the model's performance. Setup learning rate warmup, caculating F1 score, recall. (100%)
 
 ### Stage 2: Seismic Transformer V2.0
 

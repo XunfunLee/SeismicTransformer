@@ -88,3 +88,30 @@ class ProjectionModule(nn.Module):
                                    col_width=20,
                                    row_settings=["var_names"])
         print(summary)
+
+class ConvLinearModule(nn.Module):
+    """ convolution the FFT data from 1500 to 750 then upscale to 768
+    
+    Args:
+      input_size: size of the patches
+      hidden_size: embedding size of the model
+    """
+    def __init__(self, conv_output_size, linear_output_size):
+        super(ConvLinearModule, self).__init__()
+        self.conv1d = nn.Conv1d(in_channels=1, out_channels=1, kernel_size=2, stride=2)  # 假设输入是单通道
+        self.fc = nn.Linear(conv_output_size, linear_output_size)
+
+    def forward(self, x):
+        # [N, 1500] --> [N, 1, 1500]
+        x = x.unsqueeze(1)
+        # double --> float
+        x = x.float()
+
+        # x.shape --> [N, 1, 1500]
+        x = self.conv1d(x)  #  --> [N, 1, 750]
+
+        # [N, 1, 750] --> [N, 750]
+        x = x.view(x.size(0), -1)
+
+        x = self.fc(x)  # [N,750]  -->  [N, 768]
+        return x

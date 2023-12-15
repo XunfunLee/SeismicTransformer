@@ -53,7 +53,7 @@ def train_step(model: torch.nn.Module,
     train_loss, train_acc = 0, 0
 
     # Loop through data loader data batches
-    for batch, (X, y, Mask) in enumerate(dataloader):
+    for batch, (X, y, Mask, frequency) in enumerate(dataloader):
         # Send data to target device, always GPU
 
         # Mask.shape = [batch_size, 1, seq_len]     e.g. [64, 1, 13]  --> [64, 13]
@@ -61,10 +61,10 @@ def train_step(model: torch.nn.Module,
         # pytorch will due with the 2D to 4D automatically
         Mask = Mask.squeeze(1)
 
-        X, y, Mask = X.to(device), y.to(device), Mask.to(device)
+        X, y, Mask, frequency = X.to(device), y.to(device), Mask.to(device), frequency.to(device)
 
         # Forward pass
-        y_pred = model(X, mask=Mask)
+        y_pred = model(X, mask=Mask, frequency=frequency)
 
         # Calculate  and accumulate loss
         loss = loss_fn(y_pred, y)
@@ -128,17 +128,17 @@ def validation_step(model: torch.nn.Module,
     # Turn on inference context manager
     with torch.inference_mode():
         # Loop through DataLoader batches
-        for batch, (X, y, Mask) in enumerate(dataloader):
+        for batch, (X, y, Mask, frequency) in enumerate(dataloader):
             # Send data to target device
             # Mask.shape = [batch_size, 1, seq_len]     e.g. [64, 1, 13]  --> [64, 13]
             # [batch_size, 1, seq_len] --> [batch_size, seq_len] to 2D
             # pytorch will due with the 2D to 4D automatically
             Mask = Mask.squeeze(1)
 
-            X, y, Mask = X.to(device), y.to(device), Mask.to(device)
+            X, y, Mask, frequency = X.to(device), y.to(device), Mask.to(device), frequency.to(device)
 
             # 1. Forward pass
-            validation_pred_logits = model(X, mask=Mask)
+            validation_pred_logits = model(X, mask=Mask, frequency=frequency)
 
             # 2. Calculate and accumulate loss
             loss = loss_fn(validation_pred_logits, y)
@@ -279,17 +279,17 @@ def test(model: torch.nn.Module,
 
     with torch.inference_mode():
         # Loop through DataLoader batches
-        for batch, (X, y, Mask) in enumerate(dataloader):
+        for batch, (X, y, Mask, frequency) in enumerate(dataloader):
             # Send data to target device
             # Mask.shape = [batch_size, 1, seq_len]     e.g. [64, 1, 13]  --> [64, 13]
             # [batch_size, 1, seq_len] --> [batch_size, seq_len] to 2D
             # pytorch will due with the 2D to 4D automatically
             Mask = Mask.squeeze(1)
 
-            X, y, Mask = X.to(device), y.to(device), Mask.to(device)
+            X, y, Mask, frequency = X.to(device), y.to(device), Mask.to(device), frequency.to(device)
 
             # Forward pass
-            y_logit = model(X, mask=Mask)
+            y_logit = model(X, mask=Mask, frequency=frequency)
 
             # Predictions
             _, predicted_labels = torch.max(y_logit, 1)

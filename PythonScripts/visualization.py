@@ -376,7 +376,8 @@ def SaveAttnHeatMapBarChart(model: torch.nn.Module,
                             save_dir: str,
                             plot_mode: str = 'single',
                             fontsize: int = 15,
-                            titlesize: int = 18):
+                            titlesize: int = 18,
+                            attn_weights: int = 12):
     # Ensure the save directory exists
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -409,17 +410,17 @@ def SaveAttnHeatMapBarChart(model: torch.nn.Module,
         heatmap = axs[0].imshow(aw, cmap='Reds', aspect='auto', vmin=0, vmax=0.5)
         cbar = fig.colorbar(heatmap, ax=axs[0])
         cbar.ax.tick_params(labelsize=fontsize)
-        axs[0].set_xticks(range(12))
-        axs[0].set_xticklabels(range(1, 13), fontsize=fontsize)
-        axs[0].set_yticks(range(12))
-        axs[0].set_yticklabels(range(1, 13), fontsize=fontsize)
+        axs[0].set_xticks(range(attn_weights))
+        axs[0].set_xticklabels(range(1, attn_weights+1), fontsize=fontsize)
+        axs[0].set_yticks(range(attn_weights))
+        axs[0].set_yticklabels(range(1, attn_weights+1), fontsize=fontsize)
         axs[0].set_title(f'Layer {i+1} Attention Weights', fontsize=titlesize)
 
         # Bar chart
         means = aw.mean(axis=0)
-        axs[1].bar(range(1, 13), means, color='darkred')
-        axs[1].set_xticks(range(1, 13))
-        axs[1].set_xticklabels(range(1, 13), fontsize=fontsize)
+        axs[1].bar(range(1, attn_weights+1), means, color='darkred')
+        axs[1].set_xticks(range(1, attn_weights+1))
+        axs[1].set_xticklabels(range(1, attn_weights+1), fontsize=fontsize)
         axs[1].tick_params(axis='y', labelsize=fontsize)
         axs[1].set_ylim(0, 0.5)
         axs[1].set_title(f'Layer {i+1} Attention Weights Mean', fontsize=titlesize)

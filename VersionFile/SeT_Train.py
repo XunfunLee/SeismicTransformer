@@ -69,7 +69,6 @@ from PythonScripts.transformer import SeismicTransformer
 from PythonScripts.train import train, test
 from PythonScripts.visualization import SaveLossAccCurves, SaveConfusionMatrix, SaveAttnHeatMap, SavePosiHeadMap, SaveAttnHeatMapBarChart, SavePosiSimilarity
 from transformers import get_linear_schedule_with_warmup
-import matplotlib
 
 # Set GPU first
 device = SetDevice()

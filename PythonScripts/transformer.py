@@ -347,13 +347,13 @@ class SeismicTransformerV2(nn.Module):
                                             requires_grad=True)
 
         # Time token
-        self.time_token = nn.Parameter(torch.randn(1, 1, embedding_dim))  # [1, 1, d_model]
+        self.time_token = nn.Parameter(torch.randn(1, 1, embedding_dim),requires_grad=True)  # [1, 1, d_model]
 
         # Frequency token
-        self.frequency_token = nn.Parameter(torch.randn(1, 1, embedding_dim))  # [1, 1, d_model]
+        self.frequency_token = nn.Parameter(torch.randn(1, 1, embedding_dim),requires_grad=True)  # [1, 1, d_model]
 
-        # Create learnable position embedding                                                               [batch_size, 13, 768]
-        self.position_embedding = nn.Parameter(data=torch.randn(1, self.num_patches+1+2, embedding_dim),
+        # Create learnable position embedding                                                               [batch_size, 14, 768]
+        self.position_embedding = nn.Parameter(data=torch.randn(1, self.num_patches+1+1, embedding_dim),
                                                requires_grad=True)
 
         # Create embedding dropout value
@@ -402,22 +402,22 @@ class SeismicTransformerV2(nn.Module):
         # projection (ViT don't have this)                                                      [64, 12, 250] --> [64, 12, 768]
         x = self.projection(x)
 
-        # add time token to time embedding patches
+        # add time token to time embedding patches                                              [64, 12, 768] --> [64, 12, 768]
         x = x + time_tokens
         
         # convolution and linear projection (ViT don't have this)                                              [64, 1, 1500] --> [64, 1, 768]
         frequency = self.conv_linear(frequency)
         
-        # add frequency token to frequency embedding patches
-        freq_data_with_token = torch.cat([freq_tokens, frequency.unsqueeze(1)], dim=1)  # [batch_size, 1, d_model]
+        # add frequency token to frequency embedding patches                                                   [64, 1, 768] --> [64, 1, 768]
+        freq_data_with_token = freq_tokens + frequency.unsqueeze(1)
 
-        # adding time data with token and frequency data with token
-        combined_data = torch.cat([x, freq_data_with_token], dim=1)  # [batch_size, n_time_parts+1, d_model]
+        # adding time data with token and frequency data with token                                            [64, 12, 768] --> [64, 13, 768]
+        combined_data = torch.cat([x, freq_data_with_token], dim=1)
 
-        # Concat class embedding and patch embedding (equation 1 in ViT)
-        x = torch.cat((class_token, combined_data), dim=1)
+        # Concat class embedding and patch embedding (equation 1 in ViT)                                       [64, 13, 768] --> [64, 14, 768]
+        x = torch.cat([class_token, combined_data], dim=1)
 
-        # Add position embedding to patch embedding (equation 1 in ViT) 
+        # Add position embedding to patch embedding (equation 1 in ViT)                                        [64, 14, 768] --> [64, 14, 768]
         x = self.position_embedding + x
 
         # Run embedding dropout (Appendix B.1 in ViT)

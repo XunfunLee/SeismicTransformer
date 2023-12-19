@@ -22,6 +22,7 @@ from sklearn.metrics import confusion_matrix
 import os
 import torch.nn.functional as F
 import torch
+import pandas as pd
 
 # 1. Plot the ground motion time series data
 # 1.1 subplot for each ground motion
@@ -113,52 +114,65 @@ def PlotGM(gm_timeseries:np.ndarray):
     plt.legend(['Acceleration'])
     plt.show()
 
-# 2. Save(plot) the loss curve function
-# def SaveLossAccCurves(results: Dict[str, List],
-#                       save_dir: str,
-#                       fontsize:int=15,
-#                       titlesize:int=18):
-#     """Plots training curves of a results dictionary.
+# 1.4 Save the ground motion
+def SaveGM(gm_timeseries:np.ndarray,
+           save_dir:str):
+    """Save one Ground motion records
 
-#     Args:
-#         results (dict): dictionary containing list of values, e.g.
-#             {"train_loss": [...],
-#              "train_acc": [...],
-#              "validation_loss": [...],
-#              "validation_acc": [...]}
-#         save_dir: save directory
-#     """
-#     loss = results["train_loss"]
-#     validation_loss = results["validation_loss"]
+    Args:
+    gm_timeseries_array: Array contain ground motion array
 
-#     accuracy = results["train_acc"]
-#     validation_accuracy = results["validation_acc"]
-
-#     epochs = range(len(results["train_loss"]))
-
-#     plt.rcParams['font.family'] = 'Times New Roman'
-
-#     plt.figure(figsize=(15, 7))
-
-#     # Plot loss
-#     plt.subplot(1, 2, 1)
-#     plt.plot(epochs, loss, label="train_loss")
-#     plt.plot(epochs, validation_loss, label="validation_loss")
-#     plt.title("Loss", fontsize=titlesize)
-#     plt.xlabel("Epochs", fontsize=fontsize)
-#     plt.legend()
-
-#     # Plot accuracy
-#     plt.subplot(1, 2, 2)
-#     plt.plot(epochs, accuracy, label="train_accuracy")
-#     plt.plot(epochs, validation_accuracy, label="validation_accuracy")
-#     plt.title("Accuracy", fontsize=titlesize)
-#     plt.xlabel("Epochs", fontsize=fontsize)
-#     plt.legend()
+    """
+    times = []
+    for i in range(0, len(gm_timeseries)):
+        times.append(i)
+        i = i + 0.02
     
-#     # save the image
-#     plt.savefig(os.path.join(save_dir, "Acc_Loss_Curve.svg"), format='svg', bbox_inches='tight')
+    plt.figure(figsize=(15, 5))
+    plt.plot(times, gm_timeseries, marker='o', linestyle='-')
+    plt.title('Acceleration over Time')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Acceleration (m/s^2)')
+    plt.grid(True)
+    plt.legend(['Acceleration'])
+    # Save the image
+    plt.savefig(os.path.join(save_dir, "Example-GM.svg"), format='svg', bbox_inches='tight')
+    plt.close()  # Close the plot to free memory
 
+# 1.5 Save the ground motion pieces after patching
+def SaveGMPatches(gm_timeseries:np.ndarray,
+                  save_dir:str):
+    """Save one Ground motion records
+
+    Args:
+    gm_timeseries_array: Array contain ground motion array
+
+    """
+
+        # number of sub plots = Length / patch_size
+    num_subplots = 3000 / 250
+
+    # each points of the subplot
+    points_per_subplot = int(3000 // num_subplots)
+
+    # create the figure and subplot
+    fig, axes = plt.subplots(nrows=1, ncols=int(num_subplots), figsize=(20, 2), sharex=True, sharey=True)
+
+    # create every subplot
+    for i in range(int(num_subplots)):
+        start_index = i * points_per_subplot
+        end_index = (i + 1) * points_per_subplot if i < num_subplots - 1 else 3000
+        axes[i].plot(gm_timeseries[start_index:end_index])
+        axes[i].set_title(f"Subplot {i + 1}")
+
+    # gap between subplot
+    plt.tight_layout()
+    # Save the image
+    plt.savefig(os.path.join(save_dir, "Example-GM-Patches.svg"), format='svg', bbox_inches='tight')
+    plt.close()  # Close the plot to free memory
+
+
+# 2. Save(plot) the loss curve function
 def SaveLossAccCurves(results: Dict[str, List],
                       save_dir: str,
                       fontsize:int=15,
@@ -217,49 +231,6 @@ def SaveLossAccCurves(results: Dict[str, List],
     plt.close()  # Close the plot to free memory
 
 # 4. Save(plot) confusion matrix
-# def SaveConfusionMatrix(y_true: np.ndarray,
-#                         y_pred: np.ndarray,
-#                         class_names: list,
-#                         save_dir: str,
-#                         fontsize:int=15,
-#                         titlesize:int=18):
-#     """Plots the confusion matrix and saves it as an SVG image.
-
-#     Args:
-#         y_true: numpy array from true result
-#         y_pred: numpy array from prediction result
-#         class_names: class names for the axis ticks
-#         save_dir: directory where to save the confusion matrix image
-#         fontsize: font size for the text in the matrix (default=15)
-#         titlesize: font size for the title (default=18)
-#     """
-
-#     # Calculate the confusion matrix
-#     cm = confusion_matrix(y_true, y_pred)
-#     plt.rcParams['font.family'] = 'Times New Roman'
-
-#     # Create a figure for the heatmap
-#     plt.figure(figsize=(10, 7))
-
-#     # Draw the heatmap
-#     sns.heatmap(cm, annot=True, fmt='g', cmap='Blues',
-#                 xticklabels=class_names, yticklabels=class_names,
-#                 annot_kws={"size": fontsize})  # Set font size for annotations
-
-#     # Title and labels
-#     plt.xlabel('Predicted', fontsize=fontsize)
-#     plt.ylabel('True', fontsize=fontsize)
-#     plt.title('Confusion Matrix', fontsize=titlesize)
-
-#     # Set the font size for the axis ticks
-#     plt.xticks(fontsize=fontsize)
-#     plt.yticks(fontsize=fontsize)
-
-#     # Save the image
-#     if not os.path.exists(save_dir):
-#         os.makedirs(save_dir)
-#     plt.savefig(os.path.join(save_dir, "confusion_matrix.svg"), format='svg', bbox_inches='tight')
-#     plt.close()  # Close the plot to free memory
 def SaveConfusionMatrix(y_true: np.ndarray,
                         y_pred: np.ndarray,
                         class_names: list,
@@ -341,6 +312,14 @@ def SaveAttnHeatMap(model:torch.nn.Module,
         figsize:tuple=(12, 10)
 
     attention_weights_list = model.attention_weights_list
+    # find the min and max value of the attention weights
+    all_weights = torch.cat([layer[0, 1:, 1:].detach() for layer in attention_weights_list])
+    vmin = all_weights.min()
+    vmax = all_weights.max()
+
+    # Set the font style
+    plt.rcParams['font.family'] = 'Times New Roman'
+
     # We want to display a heatmap without the weights corresponding to the class token, which we assume is at index 0.
     # Therefore, we select the weight matrix excluding the first row and column.
     fig, axes = plt.subplots(nrows=num_of_row, ncols=num_of_col, figsize=figsize)  # Large figure with 2 rows and 6 columns for subplots
@@ -355,7 +334,7 @@ def SaveAttnHeatMap(model:torch.nn.Module,
         col_idx = layer_idx % num_of_col
 
         # Plot the heatmap on the appropriate subplot axis.
-        ax = sns.heatmap(attn_matrix, cmap='viridis', annot=annot, fmt=".2f", ax=axes[row_idx, col_idx])     # annot can decide the number of heat map
+        ax = sns.heatmap(attn_matrix, cmap='viridis', annot=annot, fmt=".2f", ax=axes[row_idx, col_idx], vmin=vmin, vmax=vmax)     # annot can decide the number of heat map
         cbar = ax.collections[0].colorbar
         cbar.ax.tick_params(labelsize=fontsize)
         # Set the title for the subplot.
@@ -376,8 +355,7 @@ def SaveAttnHeatMapBarChart(model: torch.nn.Module,
                             save_dir: str,
                             plot_mode: str = 'single',
                             fontsize: int = 15,
-                            titlesize: int = 18,
-                            attn_weights: int = 12):
+                            titlesize: int = 18):
     # Ensure the save directory exists
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -388,7 +366,6 @@ def SaveAttnHeatMapBarChart(model: torch.nn.Module,
         os.makedirs(attention_weights_dir)
 
     attention_weights_list = model.attention_weights_list
-
 
     if plot_mode == "multiple":
         # for dozens of evluation plot and get the first
@@ -406,27 +383,29 @@ def SaveAttnHeatMapBarChart(model: torch.nn.Module,
     for i, aw in enumerate(trimmed_attention_matrix):
         fig, axs = plt.subplots(1, 2, figsize=(12, 5))
 
+        # print(attention_weights_list[0].shape[1])
+
         # Heat map
         heatmap = axs[0].imshow(aw, cmap='Reds', aspect='auto', vmin=0, vmax=0.5)
         cbar = fig.colorbar(heatmap, ax=axs[0])
         cbar.ax.tick_params(labelsize=fontsize)
-        axs[0].set_xticks(range(attn_weights))
-        axs[0].set_xticklabels(range(1, attn_weights+1), fontsize=fontsize)
-        axs[0].set_yticks(range(attn_weights))
-        axs[0].set_yticklabels(range(1, attn_weights+1), fontsize=fontsize)
+        axs[0].set_xticks(range(attention_weights_list[0].shape[1]-1))
+        axs[0].set_xticklabels(range(1, attention_weights_list[0].shape[1]), fontsize=fontsize)
+        axs[0].set_yticks(range(attention_weights_list[0].shape[1]-1))
+        axs[0].set_yticklabels(range(1, attention_weights_list[0].shape[1]), fontsize=fontsize)
         axs[0].set_title(f'Layer {i+1} Attention Weights', fontsize=titlesize)
 
         # Bar chart
         means = aw.mean(axis=0)
-        axs[1].bar(range(1, attn_weights+1), means, color='darkred')
-        axs[1].set_xticks(range(1, attn_weights+1))
-        axs[1].set_xticklabels(range(1, attn_weights+1), fontsize=fontsize)
+        axs[1].bar(range(1, attention_weights_list[0].shape[1]), means, color='darkred')
+        axs[1].set_xticks(range(1, attention_weights_list[0].shape[1]))
+        axs[1].set_xticklabels(range(1, attention_weights_list[0].shape[1]), fontsize=fontsize)
         axs[1].tick_params(axis='y', labelsize=fontsize)
         axs[1].set_ylim(0, 0.5)
         axs[1].set_title(f'Layer {i+1} Attention Weights Mean', fontsize=titlesize)
 
         plt.tight_layout()
-
+        
         # Save each figure in the 'AttentionWeights' subdirectory
         plt.savefig(os.path.join(attention_weights_dir, f'attention_weights_layer_{i+1}.svg'), format='svg', bbox_inches='tight')
         plt.close()
@@ -506,6 +485,6 @@ def SavePosiSimilarity(model:torch.nn.Module,
     plt.ylabel('Position', fontsize=fontsize)
     plt.title('Position Embedding Similarity', fontsize=titlesize)
 
-    plt.xticks(range(13), fontsize=fontsize)
-    plt.yticks(range(13), fontsize=fontsize)
+    plt.xticks(range(position_embedding.shape[0]), fontsize=fontsize)
+    plt.yticks(range(position_embedding.shape[0]), fontsize=fontsize)
     plt.savefig(os.path.join(save_dir, "Position_Embedding_Similarity.svg"), format='svg')

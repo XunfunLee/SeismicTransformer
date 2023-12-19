@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(description='Process some hyperparameters.')
 # Add hyper-parameter
 parser.add_argument('--patch_size', type=int, default=250, help='patch size')
 parser.add_argument('--hidden_size', type=int, default=768, help='hidden size')
-parser.add_argument('--num_layer', type=int, default=4, help='number of layers')
+parser.add_argument('--num_layer', type=int, default=12, help='number of layers')
 parser.add_argument('--num_head', type=int, default=12, help='number of heads')
 parser.add_argument('--batch_size', type=int, default=1972, help='number of batches')
 parser.add_argument('--epoch', type=int, default=20, help='number of epochs')
@@ -89,6 +89,11 @@ print(
 )
 
 ###### ---------------------- 1. Data Preparation ---------------------- ######
+'''
+1. load the data from matlab
+2. create mask
+3. calculate the frequency data (FFT)
+'''
 
 file_name = "cnn_[0.1-dif-20_57spp]_center-50Hz-60s_Mode0_x10_balBySameInd.mat"
 traindata_path, valdata_path, testdata_path = LoadData(time_series=DATA_SOURCE,
@@ -103,10 +108,12 @@ GM_Length = train_data.size(1)         # train_data = torch.size([num_of_gms, *l
 # Calculate the number of patches
 Num_Of_Patch = int(GM_Length / PATCH_SIZE)
 
+########## --------------- optional --------------- ##########
 # Generate the mask for the dataset instead of using the padding 0
 # traindata_mask_list = MaskingData(input_array=train_data.numpy(), min_length=PATCH_SIZE, factor=50)
 # validationdata_mask_list = MaskingData(input_array=validation_data.numpy(), min_length=PATCH_SIZE, factor=50)
 # testdata_mask_list = MaskingData(input_array=test_data.numpy(), min_length=PATCH_SIZE, factor=50)
+########## --------------- optional --------------- ##########
 
 # Generate the fake mask which all is not padding, for comparison ------------------------------------
 traindata_mask_list = MaskingDataFake(input_array=train_data.numpy())
@@ -133,7 +140,11 @@ test_frequency = FastFourierTransform(test_data)
 
 
 ###### ---------------------- 2. Dataloader ---------------------- ######
-
+'''
+1. process the data dimension, turn to tensor, match the size
+2. merge the train, validation dataset and split them randomly
+3. create dataloader
+'''
 
 # ground motion data: add an extra dimension to match the model input
 # [num_of_gms, length_of_each_gm] ----> [num_of_gms, length_of_each_gm, 1]
@@ -162,14 +173,11 @@ train_dataloader, validation_dataloader = CreateDataLoadersWithMultiDatasetV2(da
                                                                             train_ratio=TRAIN_RATIO,
                                                                             batch_size=BATCH_SIZE)
 
-#################################################################### testing 
+############### testing line ################
 # for batch, (data, label, mask) in enumerate(train_dataloader):
 #     print(f"train data - Batch: {batch} | Data: {data.shape} | Label: {label.shape} | Mask: {mask.shape}")
-#################################################################### testing
+############### testing line ################
 
-# Create dataloader (from single dataset)
-# train_dataloader = CreateDataLoader(train_data, train_labels, BATCH_SIZE)
-# validation_dataloader = CreateDataLoader(validation_data, validation_labels, BATCH_SIZE)
 test_dataloader = CreateDataLoaderV2(input_data=test_data, 
                                    labels=test_labels, 
                                    mask=testdata_mask_list_1D,
@@ -177,10 +185,10 @@ test_dataloader = CreateDataLoaderV2(input_data=test_data,
                                    batch_size=BATCH_SIZE)
 print(f"Length of test dataset({len(test_data)})")
 
-#################################################################### testing
+############### testing line ################
 # for batch, (data, label, mask) in enumerate(test_dataloader):
 #     print(f"test data - Batch: {batch} | Data: {data.shape} | Label: {label.shape} | Mask: {mask.shape}")
-#################################################################### testing
+############### testing line ################
 
 ###### ---------------------- 3. Split data into patches and embedding ---------------------- ######
 
@@ -321,8 +329,7 @@ if results["is_nan"] == []:
     # Save the attention weights heat map with bar chart
     SaveAttnHeatMapBarChart(model=SeT,
                             save_dir=save_dir,
-                            plot_mode="multiple",
-                            attn_weights=14)
+                            plot_mode="multiple")
 
     # Save the potisional head map
     SavePosiHeadMap(model=SeT,

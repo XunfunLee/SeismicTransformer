@@ -189,7 +189,7 @@ def MaskingData(input_array: np.ndarray,
     return mask
 
 # 4
-def TransformMaskData(mask_data: np.ndarray,
+def TransformMaskDataV1(mask_data: np.ndarray,
                       num_of_patch:int=12,
                       patch_size:int=250) -> torch.Tensor:
 
@@ -244,17 +244,14 @@ def TransformMaskData(mask_data: np.ndarray,
         # If we adding Frecrency and Structural propetries in front of the class token, we need to add more dimension here for padding.
         class_token_mask = torch.zeros(1, dtype=torch.bool)
 
-        # add time token mask and frequency token mask
-        time_token_mask = torch.zeros(1, dtype=torch.bool)
-        frequency_token_mask = torch.zeros(1, dtype=torch.bool)
-        attn_weights_mask_with_classtoken_1D = torch.cat((class_token_mask, time_token_mask, attn_weights_mask_1D, frequency_token_mask), dim=0)
+        attn_weights_mask_with_classtoken_1D = torch.cat((class_token_mask, attn_weights_mask_1D), dim=0)
         
         results.append(attn_weights_mask_with_classtoken_1D)
 
     # here our output is 1D mask while the model need 2D input, we scale the dimension inside the multi-head attention forward function to save the memory
     return torch.stack(results)
 
-# 4
+# 4 adding frequency mask
 def TransformMaskDataV2(mask_data: np.ndarray,
                       num_of_patch:int=12,
                       patch_size:int=250) -> torch.Tensor:
@@ -310,10 +307,9 @@ def TransformMaskDataV2(mask_data: np.ndarray,
         # If we adding Frecrency and Structural propetries in front of the class token, we need to add more dimension here for padding.
         class_token_mask = torch.zeros(1, dtype=torch.bool)
 
-        # add time token mask and frequency token mask
-        time_token_mask = torch.zeros(1, dtype=torch.bool)
+        # add frequency with token mask
         frequency_token_mask = torch.zeros(1, dtype=torch.bool)
-        attn_weights_mask_with_classtoken_1D = torch.cat((class_token_mask, time_token_mask, attn_weights_mask_1D, frequency_token_mask), dim=0)
+        attn_weights_mask_with_classtoken_1D = torch.cat((class_token_mask, attn_weights_mask_1D, frequency_token_mask), dim=0)
         
         results.append(attn_weights_mask_with_classtoken_1D)
 
@@ -322,7 +318,7 @@ def TransformMaskDataV2(mask_data: np.ndarray,
 
 
 # 5 Put data into dataloader, also from numpy array to tensor
-def CreateDataLoader(input_data:torch.Tensor, 
+def CreateDataLoaderV1(input_data:torch.Tensor, 
                      labels:torch.Tensor,
                      mask:torch.Tensor,
                      batch_size:int) -> DataLoader:
@@ -417,7 +413,7 @@ class DataLabelMaskFreqDataset(Dataset):
         return data, label, mask, frequency
 
 # 7 data, label, mask
-def CreateDataLoadersWithMultiDataset(data_list:List[torch.Tensor],
+def CreateDataLoadersWithMultiDatasetV1(data_list:List[torch.Tensor],
                                     label_list:List[torch.Tensor], 
                                     mask_list:List[torch.Tensor],
                                     train_ratio:float=0.8, 

@@ -51,6 +51,8 @@ SeT-1 using 110k training and validation data, 1.7k test data (comes from @Jie Z
 * **input**: time-seires data of ground motion. (key mask is optional, effect is not obivious.)
 * **output**: one label (5 classification task).
 
+<img width="825" alt="SeT-1 jpg" src="https://github.com/XunfunLee/SeismicTransformer/assets/129706253/5c9a04a8-7c55-4c9b-8588-1c05d0a8557c">
+
 #### 3.1.1 File Description
 
 ##### `SeT_Base.ipynb` (**Step 1**): for **beginner** to know how transformer works basically

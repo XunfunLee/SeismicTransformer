@@ -107,9 +107,9 @@ In conclusion, SeT-1 is a good start but still lack of training data. A lot of s
 
 -----
 
-### 3.2 Seismic Transformer V2.0 (Completed, not release)
+### 3.2 Seismic Transformer V2.0 (Released)
 
-SeT-2 is an update of SeT-1, which adding frequency information by doing ***Fast Fourier Transfromation***. After comparasion (infact is just thinking), frequency information is treated as an input of the sequences but adding two token to specify time series data and frequency data. Different from 12 patches + 1 class token of SeT-1 (forward function inside the SeT-1-base is `(batch_size, [CLS] + 12 patches time series data, 768)` = `[batch_size, 13, 768]`), while SeT-2-base has 3 tokens and 12 patches (`(batch_size, [CLS] + 12 patches time series data (with [TIME]) + 1 frequency data (with [FREQ]), 768)` = `[batch_size, 14, 768]`).
+SeT-2**(v2.0.0)** is an update of SeT-1, which adding frequency information by doing ***Fast Fourier Transfromation***. After comparasion (infact is just thinking), frequency information is treated as an input of the sequences but adding two token to specify time series data and frequency data. Different from 12 patches + 1 class token of SeT-1 (forward function inside the SeT-1-base is `(batch_size, [CLS] + 12 patches time series data, 768)` = `[batch_size, 13, 768]`), while SeT-2-base has 3 tokens and 12 patches (`(batch_size, [CLS] + 12 patches time series data (with [TIME]) + 1 frequency data (with [FREQ]), 768)` = `[batch_size, 14, 768]`).
 
 * **input**: time-seires data of ground motion. 
   * **frequency data** is needed in V2.0(will generate during the data processing) and effect is obvious from the attention weights

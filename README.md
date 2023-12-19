@@ -153,7 +153,7 @@ Some results of the SeT-2 model are listed below:
 | **SeT-2-Base** | patch_size=250, hidden_size=768, layer=12,	head=12,	epoch=20, batch_size=1972, learning_rate=0.001, weight_decay=0, dropout_mlp=0.1| 99%, 92%, 83% |
 | **SeT-2-1** | patch_size=250, hidden_size=768, `layer=4`,	head=12,	epoch=20, batch_size=1972, learning_rate=0.001, weight_decay=0, dropout_mlp=0.1| 99%, 92%, 82% |
 
-In conclusion, SeT-2 is just an tiny update of SeT-1 by one-day coding. Although adding frequency information doesn't increase the model performance(while the SeT-1 performance is not bad), but we can obviouly see the frequency info of the attention weights is higher than normal sequence. I am eager to jump into SeismicGPT by adding transformer decoder! See you next version.
+In conclusion, SeT-2 is just an tiny update of SeT-1 by one-week coding. Although adding frequency information doesn't increase the model performance(while the SeT-1 performance is not bad), but we can obviouly see the frequency info of the attention weights is higher than normal sequence. I am eager to jump into SeismicGPT by adding transformer decoder! See you next version.
 
 ------------------------------------------------------------------
 

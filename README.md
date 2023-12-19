@@ -107,7 +107,12 @@ In conclusion, SeT-1 is a good start but still lack of training data. A lot of s
 
 ### 3.2 Seismic Transformer V2.0 (Completed, not release)
 
-SeT-2 is an update of SeT-1, which adding frequency information by doing ***Fast Fourier Transfromation***. After comparasion (infact is just thinking), frequency information is treated as an input of the sequences but adding two token to specify time series data and frequency data. Different from 12 patches + 1 class token of SeT-1 (forward function inside the SeT-1-base is `(batch_size, [CLS] + 12 patches time series data, 768)` = `[batch_size, 13, 768]`), while SeT-2-base has 3 tokens and 12 patches (`(batch_size, [CLS] + [TIME] + 12 patches time series data + [FREQ] + 1 frequency data, 768)` = `[batch_size, 15, 768]`).
+SeT-2 is an update of SeT-1, which adding frequency information by doing ***Fast Fourier Transfromation***. After comparasion (infact is just thinking), frequency information is treated as an input of the sequences but adding two token to specify time series data and frequency data. Different from 12 patches + 1 class token of SeT-1 (forward function inside the SeT-1-base is `(batch_size, [CLS] + 12 patches time series data, 768)` = `[batch_size, 13, 768]`), while SeT-2-base has 3 tokens and 12 patches (`(batch_size, [CLS] + 12 patches time series data (with [TIME]) + 1 frequency data (with [FREQ]), 768)` = `[batch_size, 14, 768]`).
+
+* **input**: time-seires data of ground motion. 
+  * **frequency data** is needed in V2.0(will generate during the data processing) and effect is obvious from the attention weights
+  * key mask is optional, effect is not obivious.
+* **output**: one label (5 classification task).
 
 #### 3.1.1 File Description
 
@@ -121,7 +126,19 @@ python set2_train.py --patch_size 250 --hidden_size 768 --num_layer 12 --num_hea
 
 ##### `set2_test.ipynb`: test SeT-2 model
 
-Test the **El-Centro** ground motion and plot the attention weigths heatmap and bar chart.
+Test the **El-Centro** ground motion (or other example) and plot the attention weigths heatmap and bar chart to see the preformance of the model.
+
+##### `gm_fft.ipynb`: test Fast Fourier Transformation of El-Centro ground motion
+
+A notebook to visualize the results after Fast Fourier Transformation.
+
+##### `set2_test.py`: test SeT-2 model
+
+Upgrade of `set2_test.ipynb` by modularization to python script.
+
+##### PythonScript
+
+Almost every python script has been upgrade to V2.0. Classes and function in version 1.0 has been duplicated and named V2 in SeT-2. e.g. `SeismicTransformerV2`, `TransformMaskDataV2`...
 
 #### 3.1.2 Conclusion
 
@@ -129,7 +146,7 @@ Some results of the SeT-2 model are listed below:
 
 | **Model** | **Params** | **Accuracy (train, validation, test)** |  
 | ----- | ----- | ----- |
-| **SeT-2-Base** | patch_size=250, hidden_size=768, layer=12,	head=12,	epoch=20, batch_size=1972, learning_rate=0.001, weight_decay=0, dropout_mlp=0.1| xx%, xx%, xx% |
+| **SeT-2-Base** | patch_size=250, hidden_size=768, layer=12,	head=12,	epoch=20, batch_size=1972, learning_rate=0.001, weight_decay=0, dropout_mlp=0.1| 99%, 92%, 83% |
 | **SeT-2-1** | patch_size=250, hidden_size=768, `layer=4`,	head=12,	epoch=20, batch_size=1972, learning_rate=0.001, weight_decay=0, dropout_mlp=0.1| 99%, 92%, 82% |
 
 In conclusion, SeT-2 is just an tiny update of SeT-1 by one-day coding. Although adding frequency information doesn't increase the model performance(while the SeT-1 performance is not bad), but we can obviouly see the frequency info of the attention weights is higher than normal sequence. I am eager to jump into SeismicGPT by adding transformer decoder! See you next version.

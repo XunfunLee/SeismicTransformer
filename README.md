@@ -114,6 +114,7 @@ SeT-2 is an update of SeT-1, which adding frequency information by doing ***Fast
   * key mask is optional, effect is not obivious.
 * **output**: one label (5 classification task).
 
+![SeT-2](https://github.com/XunfunLee/SeismicTransformer/assets/129706253/99b20116-8405-4e11-82a3-87858b393d68)
 
 #### 3.1.1 File Description
 

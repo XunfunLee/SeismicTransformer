@@ -114,6 +114,7 @@ SeT-2 is an update of SeT-1, which adding frequency information by doing ***Fast
   * key mask is optional, effect is not obivious.
 * **output**: one label (5 classification task).
 
+
 #### 3.1.1 File Description
 
 ##### `set2_train.py`: training python script based on `SeT_Train.py` which can run directly.

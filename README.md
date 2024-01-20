@@ -51,6 +51,8 @@ SeT-1 using 110k training and validation data, 1.7k test data (comes from @Jie Z
 * **input**: time-seires data of ground motion. (key mask is optional, effect is not obivious.)
 * **output**: one label (5 classification task).
 
+<img width="825" alt="SeT-1 jpg" src="https://github.com/XunfunLee/SeismicTransformer/assets/129706253/5c9a04a8-7c55-4c9b-8588-1c05d0a8557c">
+
 #### 3.1.1 File Description
 
 ##### `SeT_Base.ipynb` (**Step 1**): for **beginner** to know how transformer works basically
@@ -105,14 +107,16 @@ In conclusion, SeT-1 is a good start but still lack of training data. A lot of s
 
 -----
 
-### 3.2 Seismic Transformer V2.0 (Completed, not release)
+### 3.2 Seismic Transformer V2.0 (Released)
 
-SeT-2 is an update of SeT-1, which adding frequency information by doing ***Fast Fourier Transfromation***. After comparasion (infact is just thinking), frequency information is treated as an input of the sequences but adding two token to specify time series data and frequency data. Different from 12 patches + 1 class token of SeT-1 (forward function inside the SeT-1-base is `(batch_size, [CLS] + 12 patches time series data, 768)` = `[batch_size, 13, 768]`), while SeT-2-base has 3 tokens and 12 patches (`(batch_size, [CLS] + 12 patches time series data (with [TIME]) + 1 frequency data (with [FREQ]), 768)` = `[batch_size, 14, 768]`).
+SeT-2**(v2.0.0)** is an update of SeT-1, which adding frequency information by doing ***Fast Fourier Transfromation***. After comparasion (infact is just thinking), frequency information is treated as an input of the sequences but adding two token to specify time series data and frequency data. Different from 12 patches + 1 class token of SeT-1 (forward function inside the SeT-1-base is `(batch_size, [CLS] + 12 patches time series data, 768)` = `[batch_size, 13, 768]`), while SeT-2-base has 3 tokens and 12 patches (`(batch_size, [CLS] + 12 patches time series data (with [TIME]) + 1 frequency data (with [FREQ]), 768)` = `[batch_size, 14, 768]`).
 
 * **input**: time-seires data of ground motion. 
   * **frequency data** is needed in V2.0(will generate during the data processing) and effect is obvious from the attention weights
   * key mask is optional, effect is not obivious.
 * **output**: one label (5 classification task).
+
+![SeT-2](https://github.com/XunfunLee/SeismicTransformer/assets/129706253/99b20116-8405-4e11-82a3-87858b393d68)
 
 #### 3.1.1 File Description
 
@@ -149,7 +153,7 @@ Some results of the SeT-2 model are listed below:
 | **SeT-2-Base** | patch_size=250, hidden_size=768, layer=12,	head=12,	epoch=20, batch_size=1972, learning_rate=0.001, weight_decay=0, dropout_mlp=0.1| 99%, 92%, 83% |
 | **SeT-2-1** | patch_size=250, hidden_size=768, `layer=4`,	head=12,	epoch=20, batch_size=1972, learning_rate=0.001, weight_decay=0, dropout_mlp=0.1| 99%, 92%, 82% |
 
-In conclusion, SeT-2 is just an tiny update of SeT-1 by one-day coding. Although adding frequency information doesn't increase the model performance(while the SeT-1 performance is not bad), but we can obviouly see the frequency info of the attention weights is higher than normal sequence. I am eager to jump into SeismicGPT by adding transformer decoder! See you next version.
+In conclusion, SeT-2 is just an tiny update of SeT-1 by one-week coding. Although adding frequency information doesn't increase the model performance(while the SeT-1 performance is not bad), but we can obviouly see the frequency info of the attention weights is higher than normal sequence. I am eager to jump into SeismicGPT by adding transformer decoder! See you next version.
 
 ------------------------------------------------------------------
 

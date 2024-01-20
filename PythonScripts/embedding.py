@@ -1,5 +1,6 @@
 """
-Contains functionality for embedding.
+Contains functionality for embedding, only for Seismic Transformer V1.0 and V2.0.
+Version above V3.0 will use the embedding in transformer.py.
 1. Patch embedding.
 2. Projection embedding.
 

@@ -8,6 +8,8 @@ Contains functionality for process the ground motion data.
 6. Class DataLabelMaskDataset(): Create a custom dataset: store the ground motion data, label, and mask
 7. CreateDataLoadersWithMultiDataset(): Merge multi dataset and label and split them into train and validation set
 8. FastFourierTransform(): FFT the ground motion data
+9. CreateKeyPaddingMask_AllFalse(): Key padding mask for SeT-3 (all False mask which stands for no mask at all)
+10. CreateLookAheadMask(): Create look ahead mask for the decoder in SeT-3
 
 Author: Jason Jiang (Xunfun Lee)
 Date: 2023.11.30
@@ -386,9 +388,10 @@ class DataLabelMaskDataset(Dataset):
 # 6.1 data, label, mask, frequency
 class DataLabelMaskFreqDataset(Dataset):
     """Custom dataset
-    data: [n_samples, length_of_gm, 1]   e.g. [60940, 3000, 1]
-    labels: [n_samples]                  e.g. [60940]
-    masks: [n_samples, length_of_gm]     e.g. [60940, 3000]
+    data: [n_samples, length_of_gm, 1]          e.g. [60940, 3000, 1]
+    labels: [n_samples]                         e.g. [60940]
+    masks: [n_samples, length_of_gm]            e.g. [60940, 3000]
+    frequency: [n_samples, length_of_gm/2]      e.g. [60940, 1500]
 
     In fact, what this custom dataset do is just unsqueeze the mask data, comparing to th TensorDataset class
     """
@@ -468,6 +471,7 @@ def CreateDataLoadersWithMultiDatasetV2(data_list:List[torch.Tensor],
         data_list: [n_samples, length_of_gm, 1]   e.g. [60940, 3000, 1]
         label_list: [n_samples]
         mask_list: [n_samples, length_of_gm]     e.g. [60940, 3000]
+        frequency_listL [n_samples, length_of_gm / 2]   e.g. [60940, 1500]
         train_ratio: ratio of training data of the whole dataset
         batch_size: batch size
 
@@ -519,5 +523,26 @@ def FastFourierTransform(input_data:torch.Tensor) -> torch.Tensor:
     # just need 1500 points, because the rest of the points are the mirror of the first 1500 points
     output_data = np.abs(freq_domain_data[:, :1500])
     output_data = torch.from_numpy(output_data)
+    print(output_data.shape)
+
     return output_data
 
+# 9
+def CreateKeyPaddingMask_AllFalse(batch_size, seq_len) -> torch.Tensor:
+    """Create key padding mask for encoder in SeT-3
+    
+    Args:
+        size: size of the mask, usually the length of the sequence, 12 in SeT-3(encoder)
+    """
+    key_padding_mask = torch.zeros(batch_size, seq_len)
+    return key_padding_mask == 1  # convert to bool
+
+# 10
+def CreateLookAheadMask(seq_len) -> torch.Tensor:
+    """Create look ahead mask for decoder in SeT-3
+
+    Args:
+        size: size of the mask, usually the length of the sequence, 12 in SeT-3(decoder)
+    """
+    look_ahead_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)
+    return look_ahead_mask == 1  # convert to bool

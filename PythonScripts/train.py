@@ -376,6 +376,7 @@ def train_step_set3(model: torch.nn.Module,
                optimizer: torch.optim.Optimizer, 
                lr_scheduler_warmup: torch.optim.lr_scheduler.LambdaLR, 
                num_warmup_steps: int, 
+               teacher_forcing_ratio: float,
                device: torch.device) -> Tuple[float, float]:
     
     """Train step for SeismicTransformer V3.0
@@ -418,7 +419,8 @@ def train_step_set3(model: torch.nn.Module,
         damage_state_pred, dynamic_response = model(encoder_input=gm_sequence,
                                                     decoder_input=floor_sequence,
                                                     key_padding_mask=key_padding_mask,
-                                                    attn_mask=attn_mask)
+                                                    attn_mask=attn_mask,
+                                                    teacher_forcing_ratio=teacher_forcing_ratio)
 
         
         # Calculate and accumulate classification accuracy
@@ -513,7 +515,8 @@ def validation_step_set3(model: torch.nn.Module,
             damage_state_pred, dynamic_response = model(encoder_input=gm_sequence,
                                                         decoder_input=floor_sequence,
                                                         key_padding_mask=key_padding_mask,
-                                                        attn_mask=attn_mask)
+                                                        attn_mask=attn_mask,
+                                                        teacher_forcing_ratio=0.0)      # can ignore
 
             # Calculate classification accuracy
             y_pred_class = torch.argmax(torch.softmax(damage_state_pred, dim=1), dim=1)
@@ -567,6 +570,7 @@ def train_set3(model: torch.nn.Module,
         num_warmup_steps: number of warmup steps
         num_epochs: number of epochs
         device: training decive (e.g. cuda for nvidia, mps for mac)
+        teacher_forcing_ratio: how many times the model use the ground truth as input
         log_filename: log file name
     """
 
@@ -582,14 +586,22 @@ def train_set3(model: torch.nn.Module,
 
     # epoch
     for epoch in tqdm(range(num_epochs)):
+
+        # teacher_forcing_ratio decay
+        # teacher_forcing_ratio = (1 - (epoch / num_epochs)) / 2
+        teacher_forcing_ratio = (1 - (epoch / num_epochs))
+        print(f"Epoch 00{epoch} : teacher forcing ratio = {teacher_forcing_ratio}")
+
         # train step
-        train_loss, train_acc, train_mse = train_step_set3(model, train_loader,
+        train_loss, train_acc, train_mse = train_step_set3(model, 
+                                                           train_loader,
                                                            loss_fn_classification,
                                                            loss_fn_regression,
                                                            loss_fn_weight_classification,
                                                            optimizer,
                                                            lr_scheduler_warmup,
                                                            num_warmup_steps,
+                                                           teacher_forcing_ratio,
                                                            device)
         
         # if train loss = nan, break
@@ -599,11 +611,12 @@ def train_set3(model: torch.nn.Module,
             break
         
         # validation step
-        val_loss, val_acc, val_mse = validation_step_set3(model, val_loader,
-                                                         loss_fn_classification,
-                                                         loss_fn_regression,
-                                                         loss_fn_weight_classification,
-                                                         device)
+        val_loss, val_acc, val_mse = validation_step_set3(model, 
+                                                          val_loader,
+                                                          loss_fn_classification,
+                                                          loss_fn_regression,
+                                                          loss_fn_weight_classification,
+                                                          device)
         
         # if validation loss = nan, break
         if math.isnan(val_loss):
@@ -613,7 +626,7 @@ def train_set3(model: torch.nn.Module,
 
 
         # put validation_loss to lr_scheduler
-        lr_scheduler_decay.step(val_loss)
+        # lr_scheduler_decay.step(val_loss)
 
 
         # update log file(csv file), need to modify and re-import

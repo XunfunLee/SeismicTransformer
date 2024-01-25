@@ -271,6 +271,21 @@ def CreateLogFile(save_dir: str) -> str:
 
     return log_filename
 
+def CreateLogFileV3(save_dir: str) -> str:
+    """ create a csv file to store the acc and loss value during traning
+
+    Args:
+        save_dir: save dirctory
+
+    Returns:
+        log_filename: log file name(csv)
+    """
+    log_filename = os.path.join(save_dir, "training_log.csv")
+    with open(log_filename, "w") as log_file:
+        log_file.write("epoch,train_loss,validation_loss,train_accuracy,validation_accuracy,train_mse,validation_mse\n")
+
+    return log_filename
+
 def LogEpochData(epoch:int, 
                  train_loss:float, 
                  validation_loss:float, 

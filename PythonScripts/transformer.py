@@ -1083,32 +1083,70 @@ class DecoderV1(nn.Module):
         # Set device
         self.device = device
 
-    def forward(self, output_encoder, decoder_input=None, attn_mask=None, need_weights=True):
-        # Check if target_sequence is provided
+    def forward(self, output_encoder, decoder_input=None, attn_mask=None, need_weights=True, teacher_forcing_ratio=0.5):
+
+        # Training mode
         if decoder_input is not None:
-            # Training mode
-            # Use teacher forcing
-            x = decoder_input
+            # print("DecoderV1::forward:Training mode")
+            # first slice the 3000 points into 12 parts
+            chunks = torch.chunk(decoder_input, self.num_of_patch, dim=1)           # (batch_size, 3000, 1) --> (batch_size, 12, 250)
+            reshaped_chunks_list = [torch.unsqueeze(torch.squeeze(chunk, -1), 1) for chunk in chunks]        # (batch_size, 12, 250) --> 12*(batch_size, 1, 250)
+            decoder_input_list = []
+            current_sequence = torch.zeros((output_encoder.shape[0], 1, 768)).to(self.device)  # initialize empty sequence
 
-            # Patch embedding and position encoding can be done here if needed
-            # patch embedding           
-            time_sequence = self.PatchEmbedding(x)                      # (batch_size, 3000, 1) --> (batch_size, 12, 768)
+            # chose if use teacher forcing or self generated
+            for t in range(self.num_of_patch):
+                if random.random() < teacher_forcing_ratio:           # teacher forcing ratio
+                    # Use teacher forcing
+                    # print(f"No.{t} patch is using teacher forcing")
 
-            time_sequence = time_sequence + self.positional_embedding
+                    teacher_forcing_patch = self.SmallPatchEmbedding(reshaped_chunks_list[t])   # (batch_size, 1, 250) --> (batch_size, 1, 768)
+                    decoder_input_list.append(teacher_forcing_patch)
+                    # reset current sequence
+                    current_sequence = teacher_forcing_patch
+                else:
+                    # Use self generated
+                    # print(f"No.{t} patch is using self generated")
 
-            # embedding dropout
-            x = self.embedding_dropout(time_sequence)
+                    for layer in self.DecoderLayers:
+                        self_generated_patch, _, _ = layer(query=current_sequence,
+                                                        key=current_sequence,
+                                                        value=current_sequence,
+                                                        output_encoder=output_encoder)
+                    decoder_input_list.append(self_generated_patch)
+                    # reset current sequence
+                    current_sequence = self_generated_patch
 
+            # check if the length of decoder_input_list is correct
+            assert len(decoder_input_list) == self.num_of_patch, \
+                f"decoder_input_list should have {self.num_of_patch} elements, but got {len(decoder_input_list)}"
+
+            x = torch.cat(decoder_input_list, dim=1)   # N*(batch_size, 1, 768) --> (batch_size, 12, 768)
+
+        # Inference mode
         else:
+            # print("DecoderV1::forward:Inference mode")
             # Inference mode
-            # initialize a variable to store the generated sequence
-            x = self._init_sequence(batch_size=output_encoder.shape[0])
-            current_sequence = torch.zeros((output_encoder.shape[0], 0, 768)).to(self.device)  # 初始化空序列
+            current_sequence = torch.zeros((output_encoder.shape[0], 1, 768)).to(self.device)  # initialize empty sequence
+            decoder_output_list = []
 
-            # print(f"Initial sequence shape: {x.shape}")
-            # print(f"Current sequence shape: {current_sequence.shape}")
-        
-        # print(f"decoder x.shape: {x.shape}")                # (batch_size, 12, 768)
+            # Iterate over the number of patches
+            for t in range(self.num_of_patch):
+                # Generate output for the current sequence
+                for layer in self.DecoderLayers:
+                    self_generated_patch, _, _ = layer(query=current_sequence,
+                                                    key=current_sequence,
+                                                    value=current_sequence,
+                                                    output_encoder=output_encoder)
+                decoder_output_list.append(self_generated_patch)
+
+                # Update current sequence for the next step
+                current_sequence = self_generated_patch
+
+            # Concatenate all generated patches
+            x = torch.cat(decoder_output_list, dim=1)   # (batch_size, 12, 768)
+
+        # print(f"DecoderV1:: decoder_input.shape: {x.shape}")          # (batch_size, 12, 768)
 
         # clear the attention weights list
         self.mmha_attn_weights_list = []
@@ -1124,46 +1162,10 @@ class DecoderV1(nn.Module):
             # Store attention weights if needed
             self.mmha_attn_weights_list.append(mmha_attn_weights)
             self.cmha_attn_weights_list.append(cmha_attn_weights)
-
-            if decoder_input is None:
-                current_sequence = self._update_sequence(x, current_sequence)
-                # print(f"current_sequence.shape: {current_sequence.shape}")
-                # print(f"final x.shape: {x.shape}")
         
+        # print(f"DecoderV1:: output.shape: {x.shape}")          # (batch_size, 12, 768)
+
         return x
-
-    def _init_sequence(self, batch_size):
-        # 初始化序列，这里我们使用零张量作为初始序列
-        # 注意调整序列的维度以匹配模型的期望输入
-        initial_sequence = torch.zeros((batch_size, 12, 768)).to(self.device)
-        return initial_sequence
-
-    def _update_sequence(self, decoder_output, current_sequence):
-        # 更新序列，这里我们假设解码器输出的最后一个维度是要生成的序列
-        # 这里的逻辑需要根据您的具体模型和任务进行调整
-        new_sequence = decoder_output[:, -1:, :]  # 获取最后一个时间步的输出
-        updated_sequence = torch.cat((current_sequence, new_sequence), dim=1)  # 沿时间维度附加
-        return updated_sequence
-    
-    # # inference mode
-    # def generate_sequence(self, output_encoder, attn_mask=None):
-    #     # Initial sequence generation for inference mode
-    #     print(output_encoder.shape[0])
-    #     generated_sequence = self._init_sequence(batch_size=output_encoder.shape[0])
-    #     for _ in range(self.num_of_patch):
-    #         # Assume that you append to generated_sequence at each step
-    #         # You may need to modify this loop to match your actual sequence generation process
-    #         generated_sequence = self.forward(output_encoder, generated_sequence, attn_mask)
-        
-    #     return generated_sequence
-
-    # def _init_sequence(self, batch_size):
-    #     # Initialize the sequence for the decoder to start generating the output
-    #     # This can be zeros, learned embeddings, or some form of encoder output processing
-    #     initial_sequence = torch.zeros((batch_size, 3000, 1)).to(self.device)
-    #     # Modify this to suit how you want to start sequence generation
-    #     return initial_sequence
-
 
     # test code
     '''python
@@ -1317,68 +1319,20 @@ class SeismicTransformerV3(nn.Module):
                                  patch_size=patch_size,
                                  len_gm=len_gm)
         
-    def forward(self, encoder_input, decoder_input=None, key_padding_mask=None, attn_mask=None):
+    def forward(self, encoder_input, decoder_input=None, key_padding_mask=None, attn_mask=None, teacher_forcing_ratio=0.5):
         # Encoder output
         encoder_output = self.encoder(encoder_input, key_padding_mask=key_padding_mask)
 
         encoder_output_to_decoder = encoder_output[:,1:13,:]
 
         # If target sequence is provided, we are in training mode, otherwise we are in inference mode
-        if decoder_input is not None:
-            # training mode
-            # decoder_output = self.decoder(output_encoder=encoder_output_to_decoder, 
-            #                               decoder_input=decoder_input, 
-            #                               attn_mask=attn_mask,
-            #                               need_weights=True)
-            # # Splicer forward pass to generate the dynamic response
-            # dynamic_response = self.splicer(decoder_output)
+        decoder_output = self.decoder(output_encoder=encoder_output_to_decoder,
+                                        decoder_input=decoder_input,
+                                        attn_mask=attn_mask,
+                                        need_weights=True,
+                                        teacher_forcing_ratio=teacher_forcing_ratio)
             
-            # Training mode with Scheduled Sampling
-            # ------------------------------------------------------------------------------
-            outputs = []
-            # input = decoder_input[:, 0:250, :].unsqueeze(1)  # Start with the first input
-            input = decoder_input
-
-            print(f"input.shape: {input.shape}")
-
-            for t in range(1, 12):          # for number of patches is 12
-
-                # input_embedded = self.decoder.PatchEmbedding(input)
-                # input_embedded = input_embedded + self.decoder.positional_embedding
-                # input_embedded = self.decoder.embedding_dropout(input_embedded)
-
-                decoder_output = self.decoder(output_encoder=encoder_output_to_decoder, 
-                                              decoder_input=input, 
-                                              attn_mask=attn_mask,
-                                              need_weights=True)
-                outputs.append(decoder_output)
-                
-                # Decide whether to use teacher forcing
-                if random.random() < 0.5:
-                    # Use the next true token as the next input
-                    next_patch = decoder_input[:, t*250:(t+1)*250, :].unsqueeze(1)
-
-                    
-
-                    input = next_patch          # (batch_size, 1, 250, 1) problem is here! because of decoder only take 3000 as input
-
-
-
-                else:
-                    # Use the model's own prediction as the next input
-                    input = decoder_output
-
-            decoder_output = torch.cat(outputs, dim=1)
-            # ------------------------------------------------------------------------------
-
-        else:
-            # inference mode
-            decoder_output = self.decoder(output_encoder=encoder_output_to_decoder,
-                                          decoder_input=None,
-                                          attn_mask=attn_mask,
-                                          need_weights=True)
-            
-            dynamic_response = self.splicer(decoder_output)
+        dynamic_response = self.splicer(decoder_output)
 
         # Classifier forward pass to determine the damage state
         # damage_state is logits, put 0 index logit through classifier

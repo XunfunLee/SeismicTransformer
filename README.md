@@ -55,15 +55,15 @@ SeT-1 using 110k training and validation data, 1.7k test data (comes from @Jie Z
 
 #### 3.1.1 File Description
 
-##### `SeT_Base.ipynb` (**Step 1**): for **beginner** to know how transformer works basically
+#### `SeT_Base.ipynb` (**Step 1**): for **beginner** to know how transformer works basically
 
 This is a python notebook for the beginner to learn transformer architecture. This notebook don't rely on other python scripts, all function and class come from pytorch library or defined inside the block.
 
-##### `SeT_Modular.ipynb` (**Step 2**): for **master** to know how transformer works after modularization
+#### `SeT_Modular.ipynb` (**Step 2**): for **master** to know how transformer works after modularization
 
 This notebook is an upgrade of `SeT_Base.ipynb`, putting all functions, classes into python scripts by modularization, getting ready for training within one line of code. But it can't work due to the change of the python scripts. Maybe some day some handsome boy will fix it :).
 
-##### `SeT_Train.py` (**Step 3**): for **professor** to train your model in a single command line
+#### `SeT_Train.py` (**Step 3**): for **professor** to train your model in a single command line
 
 This python script contains all the process from data preparation to save the model. Functions and classes definition is under "PythonScripts" folder. Using one line of code to run:
 
@@ -73,7 +73,7 @@ python SeT_Train.py --patch_size 250 --hidden_size 768 --num_layer 12 --num_head
 
 > **Note**: `batch_size`: according to your GPU VRAM, for `RTX-3090ti-24G`, can reach 1972 `batch_size` max (with a `HIDDEN_SIZE` = 768, `NUM_LAYER` = `NUM_HEAD` = 12, parmas of the model is 86M). Big model with more params require more VRAM.
 
-##### `SeT_Train_Factory.py` (**Step 4**): for **high level professor** to train multiple model in a single command line
+#### `SeT_Train_Factory.py` (**Step 4**): for **high level professor** to train multiple model in a single command line
 
 A modular and automatic scripts to run batches of training, define different params combinition to run dozens of model in just one line of code.
 
@@ -81,7 +81,7 @@ A modular and automatic scripts to run batches of training, define different par
 python SeT_Train_Factory.py
 ```
 
-##### `Test_Laboratory.ipynb` (**Step 5**): for anyone who wants to test the model performance after training by using El-Centro ground motion as test data.
+#### `Test_Laboratory.ipynb` (**Step 5**): for anyone who wants to test the model performance after training by using El-Centro ground motion as test data.
 
 You can plot, save the attention weigths (heatmap and bar chart), positional embedding(heatmap), position similarity(heatmap) of the **El-Centro** ground motion.
 
@@ -118,9 +118,11 @@ SeT-2**(v2.0.0)** is an update of SeT-1, which adding frequency information by d
 
 ![SeT-2](https://github.com/XunfunLee/SeismicTransformer/assets/129706253/99b20116-8405-4e11-82a3-87858b393d68)
 
-#### 3.1.1 File Description
+![SeT-2](https://github.com/XunfunLee/SeismicTransformer/assets/129706253/99b20116-8405-4e11-82a3-87858b393d68)
 
-##### `set2_train.py`: training python script based on `SeT_Train.py` which can run directly.
+#### 3.2.1 File Description
+
+#### `set2_train.py`: training python script based on `SeT_Train.py` which can run directly.
 
 Also can run as:
 
@@ -128,23 +130,23 @@ Also can run as:
 python set2_train.py --patch_size 250 --hidden_size 768 --num_layer 12 --num_head 12 --batch_size 1972 --epoch 20 --learning_rate 0.001 --weight_decay 0. --mlp_dropout 0.1
 ```
 
-##### `set2_test.ipynb`: test SeT-2 model
+#### `set2_test.ipynb`: test SeT-2 model
 
 Test the **El-Centro** ground motion (or other example) and plot the attention weigths heatmap and bar chart to see the preformance of the model.
 
-##### `gm_fft.ipynb`: test Fast Fourier Transformation of El-Centro ground motion
+#### `gm_fft.ipynb`: test Fast Fourier Transformation of El-Centro ground motion
 
 A notebook to visualize the results after Fast Fourier Transformation.
 
-##### `set2_test.py`: test SeT-2 model
+#### `set2_test.py`: test SeT-2 model
 
 Upgrade of `set2_test.ipynb` by modularization to python script.
 
-##### PythonScript
+#### **PythonScript**
 
 Almost every python script has been upgrade to V2.0. Classes and function in version 1.0 has been duplicated and named V2 in SeT-2. e.g. `SeismicTransformerV2`, `TransformMaskDataV2`...
 
-#### 3.1.2 Conclusion
+#### 3.2.2 Conclusion
 
 Some results of the SeT-2 model are listed below:
 
@@ -157,8 +159,41 @@ In conclusion, SeT-2 is just an tiny update of SeT-1 by one-week coding. Althoug
 
 ------------------------------------------------------------------
 
-### 3.3 SeismicGPT V1.0 (coming soon...)
+### 3.3 SeismicTransformer V3.0 (Released)
 
+SeT-3**(v3.0.0)** is huge update of SeT-2, which adding transformer decoder to the model. SeT-3 is a multi-task models which can not only predict the damage state, but also can predict the  dynamic response of the top floor of target building.
 
+In SeT-3, teacher forcing, scheduled sampling are used to train the model. The process of learning the differences between training mode and inference mode after adding decoder is real tough. GPT-4 is hard to provide a big picture of the model, so you need to know all the fundation of the model, techiniques of the training process.
 
+#### 3.3.1 File Description
 
+#### `SeT_3_Cookbook.ipynb`: build SeT-3 from scratch
+A notebook to record the process of building SeT-3, which includes all the module used in SeT-3. All modules are rewrited for the complex structure of SeT-3.
+
+#### `SeT_3_Train.ipynb`: train SeT-3
+a notebook to train the SeT-3 model. Including a lot of visualization of the training process.
+
+#### `SeT_3_Test.ipynb`: test SeT-3
+A notebook to test the SeT-3 model.
+
+#### `SeT_3_TestDecoder.ipynb`: test decoder of SeT-3
+A notebook to test the decoder module of SeT-3. Decoder block is very complex and hard to debug, so I write this notebook to test the decoder module.
+
+#### **Python Scripts:** 
+
+All the python scripts are rewrited for the complex structure of SeT-3. e.g. `SeismicTransformerV3`, `DecoderV1`...
+
+#### 3.3.2 Conclusion
+
+| **Model** | **Params** | **Validation (Acc, MSE)** |  
+| ----- | ----- | ----- |
+| **SeT-3-Base** | patch_size=250, hidden_size=768, layer=12,	head=12,	epoch=50, batch_size=512, | 79%, 0.60 |
+| **SeT-3-Large** | patch_size=250, hidden_size=768, `layer=24`,	`head=24`,	epoch=50, batch_size=256, | 82%, 0.33 |
+
+> note: SeT-3 (796MB) is using AdmaW optimizer with learning rate = 0.001, weight decay = 0.0, drouput_mlp = 0.1, lr_warmup = 20% of total steps. Teacher forcing ratio base = 1.0 with linear decay to 0.0.
+
+In conclusion, SeT-3 is a fast version to adding decoder to achieve multi-task. The performance is not good enough, but the aim of SeT-3 is to accomplish the code. SeT-4 will add multi-structure infomation to train.
+
+------------------------------------------------------------------
+
+### 3.3 SeismicTransformer V4.0 (working on...)

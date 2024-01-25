@@ -8,3 +8,4 @@ mlxtend
 tqdm
 sklearn
 transformers
+plotly

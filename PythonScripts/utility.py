@@ -59,7 +59,7 @@ def SaveModel(model: torch.nn.Module,
         num_of_layer: number of the transformer layer
         num_of_head: number of head the multi-head attention
         num_of_epoch: number of train epoch
-        save_mode: save the model or parameters only or both
+        save_mode: save the model or parameters only or both, "model" or "params" or "both"
     """
     # turn model into eval() mode
     # model.eval()
@@ -271,6 +271,21 @@ def CreateLogFile(save_dir: str) -> str:
 
     return log_filename
 
+def CreateLogFileV3(save_dir: str) -> str:
+    """ create a csv file to store the acc and loss value during traning
+
+    Args:
+        save_dir: save dirctory
+
+    Returns:
+        log_filename: log file name(csv)
+    """
+    log_filename = os.path.join(save_dir, "training_log.csv")
+    with open(log_filename, "w") as log_file:
+        log_file.write("epoch,train_loss,validation_loss,train_accuracy,validation_accuracy,train_mse,validation_mse\n")
+
+    return log_filename
+
 def LogEpochData(epoch:int, 
                  train_loss:float, 
                  validation_loss:float, 
@@ -288,6 +303,28 @@ def LogEpochData(epoch:int,
             log_file.write(f"{epoch},{round(train_loss,4)},{round(validation_loss,4)},{round(train_acc,4)},{round(validation_acc,4)}\n")
     except PermissionError:
         print(f"Permission denied while writing to {log_filename}.")
+
+def LogEpochDataV3(epoch:int, 
+                 train_loss:float, 
+                 train_acc:float,
+                 train_mse:float,
+                 validation_loss:float, 
+                 validation_acc:float,
+                 validation_mse:float,
+                 log_filename:str):
+    """ log each loss and acc in each epoch
+    Adding mse to the log file compared to LogEpochData
+
+    Args:
+        don't need to explain
+    """
+
+    try:
+        with open(log_filename, "a") as log_file:
+            log_file.write(f"{epoch},{round(train_loss,4)},{round(validation_loss,4)},{round(train_acc,4)},{round(validation_acc,4)},{round(train_mse,4)},{round(validation_mse,4)}\n")
+    except PermissionError:
+        print(f"Permission denied while writing to {log_filename}.")
+
 
 # Test the model with example ground motion data
 def TestModelWithExampleGM(file_path: str,

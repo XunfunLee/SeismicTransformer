@@ -194,4 +194,4 @@ In conclusion, SeT-3 is a fast version to adding decoder to achieve multi-task. 
 
 ------------------------------------------------------------------
 
-### 3.3 SeismicTransformer V4.0 (working on...)
+### 3.4 SeismicTransformer V4.0 (working on...)

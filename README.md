@@ -118,8 +118,6 @@ SeT-2**(v2.0.0)** is an update of SeT-1, which adding frequency information by d
 
 ![SeT-2](https://github.com/XunfunLee/SeismicTransformer/assets/129706253/99b20116-8405-4e11-82a3-87858b393d68)
 
-![SeT-2](https://github.com/XunfunLee/SeismicTransformer/assets/129706253/99b20116-8405-4e11-82a3-87858b393d68)
-
 #### 3.2.1 File Description
 
 #### `set2_train.py`: training python script based on `SeT_Train.py` which can run directly.

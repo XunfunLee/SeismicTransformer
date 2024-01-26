@@ -133,7 +133,7 @@ testdata_mask_list_1D = TransformMaskDataV2(mask_data=testdata_mask_list,
                                            num_of_patch=Num_Of_Patch,
                                            patch_size=PATCH_SIZE)
 
-# FFT for frequency domain
+# FFT for frequency domain                      [60940, 1500]
 train_frequency = FastFourierTransform(train_data)
 validation_frequency = FastFourierTransform(validation_data)
 test_frequency = FastFourierTransform(test_data)
@@ -159,10 +159,10 @@ validation_labels = torch.squeeze(validation_labels).long()
 test_labels = torch.squeeze(test_labels).long()
 
 # Create dataset list, combine train and validation dataset
-dataset_list = [train_data, validation_data]                            # train_data.shape = [num_of_gms, 3000, 1]
-labelset_list = [train_labels, validation_labels]                       # train_label.shape = [num_of_gms]
+dataset_list = [train_data, validation_data]                                     # train_data.shape = [num_of_gms, 3000, 1]
+labelset_list = [train_labels, validation_labels]                                # train_label.shape = [num_of_gms]
 maskset_list_1D = [traindata_mask_list_1D, validationdata_mask_list_1D]          # traindata_mask_list = [number_of_gm, 3000]
-frequency_list = [train_frequency, validation_frequency]
+frequency_list = [train_frequency, validation_frequency]                         # train_frequency = [num_of_gms, 1500]
 
 # Create dataloader (from dataset list), aiming to split the dataset into training dataset and validation dataset
 # it is not very neccesary to create a custom dataset to do this, it is just helpful to split the dataset, but not neccesary!!!
@@ -196,13 +196,6 @@ print(f"Length of test dataset({len(test_data)})")
 assert PATCH_SIZE <= GM_Length, f"Patch size ({PATCH_SIZE}) must be smaller than length of the ground motion ({GM_Length})."
 
 Num_Of_Classes = train_labels.size()
-
-# Patch Embedding
-patch_embedding_layer = PatchEmbedding(Num_Of_Patch, PATCH_SIZE)
-
-# Projection
-projection_layer = ProjectionModule(input_size=PATCH_SIZE, output_size=HIDDEN_SIZE)
-
 
 ###### ---------------------- 4. Build model ---------------------- ######
 

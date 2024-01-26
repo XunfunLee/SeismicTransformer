@@ -4,7 +4,7 @@
 
 *Created Date: 2023.12.3*
 
-*Final Update: 2023.12.15*
+*Final Update: 2024.01.26*
 
 ![0b042aafb6ba0395805a07402df2c27](https://github.com/XunfunLee/SeismicTransformer/assets/129706253/ffffd3d4-a447-4761-a73c-c7156d097218)
 

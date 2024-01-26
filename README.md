@@ -163,6 +163,8 @@ SeT-3**(v3.0.0)** is huge update of SeT-2, which adding transformer decoder to t
 
 In SeT-3, teacher forcing, scheduled sampling are used to train the model. The process of learning the differences between training mode and inference mode after adding decoder is real tough. GPT-4 is hard to provide a big picture of the model, so you need to know all the fundation of the model, techiniques of the training process.
 
+![image](https://github.com/XunfunLee/SeismicTransformer/assets/129706253/0ec77951-9490-4580-806e-23f8d8db3ff6)
+
 #### 3.3.1 File Description
 
 #### `SeT_3_Cookbook.ipynb`: build SeT-3 from scratch

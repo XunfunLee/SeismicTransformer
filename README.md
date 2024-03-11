@@ -4,7 +4,7 @@
 
 *Created Date: 2023.12.3*
 
-*Final Update: 2024.01.26*
+*Final Update: 2023.12.15*
 
 ![0b042aafb6ba0395805a07402df2c27](https://github.com/XunfunLee/SeismicTransformer/assets/129706253/ffffd3d4-a447-4761-a73c-c7156d097218)
 
@@ -162,8 +162,6 @@ In conclusion, SeT-2 is just an tiny update of SeT-1 by one-week coding. Althoug
 SeT-3**(v3.0.0)** is huge update of SeT-2, which adding transformer decoder to the model. SeT-3 is a multi-task models which can not only predict the damage state, but also can predict the  dynamic response of the top floor of target building.
 
 In SeT-3, teacher forcing, scheduled sampling are used to train the model. The process of learning the differences between training mode and inference mode after adding decoder is real tough. GPT-4 is hard to provide a big picture of the model, so you need to know all the fundation of the model, techiniques of the training process.
-
-![image](https://github.com/XunfunLee/SeismicTransformer/assets/129706253/0ec77951-9490-4580-806e-23f8d8db3ff6)
 
 #### 3.3.1 File Description
 

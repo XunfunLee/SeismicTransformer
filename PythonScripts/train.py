@@ -753,3 +753,324 @@ def test_set3(model: torch.nn.Module,
 
     # Return results and prediction values
     return results, (y_label_preds_numpy, y_label_trues_numpy)
+
+
+
+##### ---------------------------------- SeiscmicTransformer V4.0 ---------------------------------- #####
+"""
+Author: Jason Jiang (Xunfun Lee)
+
+date: 2023.02.03
+
+For the reason that all the modules were rewrited, the train.py is also rewrited in SeT-4.
+The main differences between SeT-4 and previous versions are:
+1. Adding structural info into the model.
+2. 
+3. 
+
+The functions in this file are:
+1. train_step_set4() for training loop.
+2. validation_step_set4() for validation loop.
+3. train_set4() for the combinition of training and validation loop.
+
+"""
+
+global_stepV4 = 0
+warmup_doneV4 = False
+
+# 1. train_step
+def train_step_set4(model: torch.nn.Module,
+               dataloader: torch.utils.data.DataLoader, 
+               loss_fn_classification: torch.nn.Module, 
+               loss_fn_regression: torch.nn.Module,
+               loss_fn_weight_classification: float,
+               optimizer: torch.optim.Optimizer, 
+               lr_scheduler_warmup: torch.optim.lr_scheduler.LambdaLR, 
+               num_warmup_steps: int, 
+               teacher_forcing_ratio: float,
+               device: torch.device) -> Tuple[float, float]:
+    
+    """Train step for SeismicTransformer V4.0
+
+    Adding structural info into the model, different from SeT-3. 
+    key_padding_mask change to 15 while it is 14 in SeT-3.
+    The rest is the same.
+
+    
+    Args:
+        model: target model you want to train
+        dataloader: dataloader of training data
+        loss_fn_classification: loss function for the classification
+        loss_fn_regression: loss function for the regression
+        loss_fn_weight_classification: weight for the classification loss
+        optimizer: optimizer for the model
+        lr_scheduler_warmup: learning rate scheduler for warmup
+        num_warmup_steps: number of warmup steps
+        device: training decive (e.g. cuda for nvidia, mps for mac)
+    """
+
+    global global_stepV4, warmup_doneV4
+
+    # Set model to training mode
+    model.train()
+
+    # Initialize the loss and classification accuracy
+    train_loss, train_acc_classification, train_mse_regression = 0.0, 0.0, 0.0
+
+    for _, (gm_sequence, building_attributes, floor_sequence, label) in enumerate(dataloader):
+
+        batch_size = gm_sequence.size(0)
+
+        # for test reason, seq_len should be parameterized
+        key_padding_mask = CreateKeyPaddingMask_AllFalse(batch_size=batch_size, seq_len=15)             # change from 14 in SeT-3 to 15 in SeT-4 (add structural info
+        attn_mask = CreateLookAheadMask(seq_len=12)
+        
+        gm_sequence = gm_sequence.to(device)
+        label = label.squeeze(-1).to(device)       # label need to be long() type to run CrossEntropyLoss()
+        floor_sequence = floor_sequence.to(device)
+        key_padding_mask = key_padding_mask.to(device)
+        attn_mask = attn_mask.to(device)
+
+        # Forward pass
+        damage_state_pred, dynamic_response = model(encoder_input=gm_sequence,
+                                                    struct_info=building_attributes,        # add structural info in SeT-4
+                                                    decoder_input=floor_sequence,
+                                                    key_padding_mask=key_padding_mask,
+                                                    attn_mask=attn_mask,
+                                                    teacher_forcing_ratio=teacher_forcing_ratio)
+
+        # Calculate and accumulate classification accuracy
+        y_pred_class = torch.argmax(torch.softmax(damage_state_pred, dim=1), dim=1)
+        y_pred_class = y_pred_class.float()
+        train_acc_classification += (y_pred_class == label).sum().item() / label.size(0)
+
+        # Check that weight is between 0 and 1
+        assert 0 <= loss_fn_weight_classification <= 1, \
+            "loss_fn_weight_classification should be between 0 and 1"
+
+        # Accumulate loss
+        # Calculate classification and regression losses
+        loss_classification = loss_fn_classification(damage_state_pred, label)  # here is direct output of the model
+        loss_regression = loss_fn_regression(dynamic_response, floor_sequence)
+        # Combine losses
+        loss = loss_fn_weight_classification * loss_classification + \
+               (1 - loss_fn_weight_classification) * loss_regression
+        train_loss += loss.item()
+
+        # Zero gradients, backward pass, and optimizer step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # Update learning rate scheduler
+        lr_scheduler_warmup.step()
+        global_stepV4 += 1
+
+        # Check for warmup completion
+        if not warmup_doneV4 and global_stepV4 >= num_warmup_steps:
+            print(f"Warmup completed at step {global_stepV4}")
+            warmup_doneV4 = True
+
+        # Early stopping in case of NaN loss
+        if torch.isnan(loss):
+            print("Loss is nan, stopping training.")
+            break
+
+        # Regression MSE
+        mse = torch.nn.functional.mse_loss(dynamic_response, floor_sequence, reduction='sum').item()
+        train_mse_regression += mse / floor_sequence.numel()
+
+    # Average the accumulated loss and classification accuracy over all batches
+    train_loss /= len(dataloader)
+    train_acc_classification /= len(dataloader)
+    train_mse_regression /= len(dataloader)
+
+    return train_loss, train_acc_classification, train_mse_regression
+
+# 2. validation_step
+def validation_step_set4(model: torch.nn.Module,
+                         dataloader: torch.utils.data.DataLoader,
+                         loss_fn_classification: torch.nn.Module,
+                         loss_fn_regression: torch.nn.Module,
+                         loss_fn_weight_classification: float,
+                         device: torch.device) -> Tuple[float, float, float]:
+    
+    """Train step for SeismicTransformer V4.0
+    
+    Args:
+        model: target model you want to train
+        dataloader: dataloader of training data
+        loss_fn_classification: loss function for the classification
+        loss_fn_regression: loss function for the regression
+        loss_fn_weight_classification: weight for the classification loss
+        device: training decive (e.g. cuda for nvidia, mps for mac)
+    """
+    
+    model.eval()
+    val_loss, val_acc_classification, val_mse_regression = 0.0, 0.0, 0.0
+
+    # inference mode
+    with torch.inference_mode():
+        for _, (gm_sequence, building_attributes, floor_sequence, label) in enumerate(dataloader):
+
+            batch_size = gm_sequence.size(0)
+
+            # for test reason, seq_len should be parameterized
+            key_padding_mask = CreateKeyPaddingMask_AllFalse(batch_size=batch_size, seq_len=15)
+            attn_mask = CreateLookAheadMask(seq_len=12)
+
+            # Move data to device
+            gm_sequence = gm_sequence.to(device)
+            label = label.squeeze(-1).to(device)         # label need to be long() type to run CrossEntropyLoss()
+            # print(f"validation_step_set4:: label.shape = {label.shape}")
+            
+            floor_sequence = floor_sequence.to(device)
+            key_padding_mask = key_padding_mask.to(device)
+            attn_mask = attn_mask.to(device)
+
+            # Forward pass
+            damage_state_pred, dynamic_response = model(encoder_input=gm_sequence,
+                                                        struct_info=building_attributes,        # add structural info in SeT-4
+                                                        decoder_input=None,                     # SeT-3 is not right for this input, validation don't need decoder_input
+                                                        key_padding_mask=key_padding_mask,
+                                                        attn_mask=attn_mask,
+                                                        teacher_forcing_ratio=0.0)      # can ignore
+
+            # Calculate classification accuracy
+            y_pred_class = torch.argmax(torch.softmax(damage_state_pred, dim=1), dim=1)
+            y_pred_class = y_pred_class.float()
+            val_acc_classification += (y_pred_class == label).sum().item() / label.size(0)
+            
+            # Calculate classification and regression losses
+            loss_classification = loss_fn_classification(damage_state_pred, label)
+            loss_regression = loss_fn_regression(dynamic_response, floor_sequence)
+            loss = loss_fn_weight_classification * loss_classification + \
+                   (1 - loss_fn_weight_classification) * loss_regression
+            val_loss += loss.item()
+            
+            # Regression MSE
+            mse = torch.nn.functional.mse_loss(dynamic_response, floor_sequence, reduction='sum').item()
+            val_mse_regression += mse / floor_sequence.numel()
+
+    val_loss /= len(dataloader)
+    val_acc_classification /= len(dataloader)
+    val_mse_regression /= len(dataloader)
+
+    return val_loss, val_acc_classification, val_mse_regression
+
+# 3. train_set4(): exactly the same as train_set3()
+def train_set4(model: torch.nn.Module,
+               train_loader: torch.utils.data.DataLoader,
+               val_loader: torch.utils.data.DataLoader,
+               loss_fn_classification: torch.nn.Module,
+               loss_fn_regression: torch.nn.Module,
+               loss_fn_weight_classification: float,
+               optimizer: torch.optim.Optimizer,
+               lr_scheduler_warmup: torch.optim.lr_scheduler.LambdaLR,
+               lr_scheduler_decay: torch.optim.lr_scheduler.ReduceLROnPlateau,
+               num_warmup_steps: int,
+               num_epochs: int,
+               device: torch.device,
+               log_filename: str) -> Dict[str, List]:
+    
+    """train() loop for SeismicTransformer V3.0
+    
+    Args:
+        model: target model you want to train
+        train_loader: dataloader of training data
+        val_loader: dataloader of validation data
+        loss_fn_classification: loss function for the classification
+        loss_fn_regression: loss function for the regression
+        loss_fn_weight_classification: weight for the classification loss
+        optimizer: optimizer for the model
+        lr_scheduler_warmup: learning rate scheduler for warmup
+        lr_scheduler_decay: learning rate scheduler for decay
+        num_warmup_steps: number of warmup steps
+        num_epochs: number of epochs
+        device: training decive (e.g. cuda for nvidia, mps for mac)
+        teacher_forcing_ratio: how many times the model use the ground truth as input
+        log_filename: log file name
+    """
+
+    # Create empty results dictionary
+    results = {"train_loss": [],
+               "train_acc": [],
+               "train_mse": [],
+               "validation_loss": [],
+               "validation_acc": [],
+               "validation_mse": [],
+               "is_nan": []
+    }
+
+    # epoch
+    for epoch in tqdm(range(num_epochs)):
+
+        # teacher_forcing_ratio decay
+        # teacher_forcing_ratio = (1 - (epoch / num_epochs)) / 2
+        teacher_forcing_ratio = (1 - (epoch / num_epochs))
+        print(f"Epoch 00{epoch} : teacher forcing ratio = {teacher_forcing_ratio}")
+
+        # train step
+        train_loss, train_acc, train_mse = train_step_set4(model, 
+                                                           train_loader,
+                                                           loss_fn_classification,
+                                                           loss_fn_regression,
+                                                           loss_fn_weight_classification,
+                                                           optimizer,
+                                                           lr_scheduler_warmup,
+                                                           num_warmup_steps,
+                                                           teacher_forcing_ratio,
+                                                           device)
+        
+        # if train loss = nan, break
+        if math.isnan(train_loss):
+            print(f"Epoch {epoch}:Train loss is NaN. Stopping training.")
+            results["is_nan"].append("yes")
+            break
+        
+        # validation step
+        val_loss, val_acc, val_mse = validation_step_set4(model, 
+                                                          val_loader,
+                                                          loss_fn_classification,
+                                                          loss_fn_regression,
+                                                          loss_fn_weight_classification,
+                                                          device)
+        
+        # if validation loss = nan, break
+        if math.isnan(val_loss):
+            print(f"Epoch {epoch}:Validation loss is NaN. Stopping training.")
+            results["is_nan"].append("yes")
+            break
+
+        # put validation_loss to lr_scheduler
+        lr_scheduler_decay.step(val_loss)
+
+        # update log file(csv file), need to modify and re-import
+        LogEpochDataV3(epoch=epoch,
+                     train_loss=train_loss,
+                     train_acc=train_acc,
+                     train_mse=train_mse,
+                     validation_loss=val_loss,
+                     validation_acc=val_acc,
+                     validation_mse=val_mse,
+                     log_filename=log_filename)
+
+        print(
+          f"Epoch: {epoch+1} | "
+          f"train_loss: {train_loss:.4f} | "
+          f"train_acc: {train_acc:.4f} | "
+          f"train_mse: {train_mse:.4f} | "
+          f"validation_loss: {val_loss:.4f} | "
+          f"validation_acc: {val_acc:.4f} | "
+          f"validation_mse: {val_mse:.4f}"
+        )
+
+        # Update results dictionary
+        results["train_loss"].append(train_loss)
+        results["train_acc"].append(train_acc)
+        results["train_mse"].append(train_mse)
+        results["validation_loss"].append(val_loss)
+        results["validation_acc"].append(val_acc)
+        results["validation_mse"].append(val_mse)
+
+    return results

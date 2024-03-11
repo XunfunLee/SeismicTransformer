@@ -10,6 +10,10 @@ Contains functionality for process the ground motion data.
 8. FastFourierTransform(): FFT the ground motion data
 9. CreateKeyPaddingMask_AllFalse(): Key padding mask for SeT-3 (all False mask which stands for no mask at all)
 10. CreateLookAheadMask(): Create look ahead mask for the decoder in SeT-3
+11. ReadH5FileV1(): Read h5 file from .h file (for SeT-3)
+12. ReadH5FileV2(): Read h5 file from .h file (for SeT-4)
+13. Class DynamicDatasetV1(): for SeT-4 to load huge data in dynamic way
+14. custom_collate(): for SeT-4 to load huge data in dynamic way
 
 Author: Jason Jiang (Xunfun Lee)
 Date: 2023.11.30
@@ -546,3 +550,154 @@ def CreateLookAheadMask(seq_len) -> torch.Tensor:
     """
     look_ahead_mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)
     return look_ahead_mask == 1  # convert to bool
+
+# 11. ReadH5FileV1(): Read h5 file from .h file (for SeT-3 and above version)
+def ReadH5FileV1(path:str,
+               dataset_name:str) -> np.ndarray:
+    
+    # Check if the file exists
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"The file at {path} does not exist.")
+
+    with h5py.File(path, 'r') as f:
+        # Check if the dataset exists
+        if dataset_name not in f:
+            raise KeyError(f"Dataset {dataset_name} not found in the file.")
+
+        data_read = f[dataset_name][:]
+
+        # Check if the dataset is empty
+        if data_read.size == 0:
+            raise ValueError(f"The dataset {dataset_name} is empty.")
+
+        print("Data read successfully")
+
+    return data_read
+
+# 12. ReadH5FileV2(): Read h5 file from .h file (for SeT-4 and above version)
+def ReadH5FileV2(path:str):
+    """Directly read structural info, acc_floor_response, blg_ds from .h5 file
+
+    Args:
+        path: path of the .h5 file
+    """
+    # Check if the file exists
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"The file at {path} does not exist.")
+
+    with h5py.File(path, 'r') as f:
+        # Check if the dataset exists
+        if "Acc_Floor_Response" not in f:
+            raise KeyError(f"Dataset 'Acc_Floor_Response' not found in the file.")
+
+        acc_floor_response = f["Acc_Floor_Response"][:]
+
+        if "Blg_Damage_State" not in f:
+            raise KeyError(f"Dataset 'Blg_Damage_State' not found in the file.")
+
+        blg_ds = f["Blg_Damage_State"][:]
+
+        print("Data read successfully")
+
+    return acc_floor_response, blg_ds   # [198018, 3000] & [198018, 1] in SeT-4
+
+# 13 Class dynamic dataset
+class DynamicDatasetV1(Dataset):
+    """Load h5 files for SeT-4 training
+
+    Args:
+        gm_file_path: path to the ground motion file
+        building_files_dir: directory containing the building files
+        device: device to load the tensors (for the dictionary of building attributes)
+    
+    """
+    def __init__(self, 
+                 gm_file_path: str, 
+                 building_files_dir: str,
+                 device: torch.device):
+        
+        self.gm_file_path = gm_file_path
+        self.building_files = [
+            os.path.join(building_files_dir, f)
+            for f in os.listdir(building_files_dir) if f.endswith('.h5')
+        ]
+        self.device = device
+
+        with h5py.File(self.gm_file_path, 'r') as f:
+            self.num_gm_samples = f['Acc_GMs'].shape[0]  # Total number of ground motions
+
+        self.num_building_conditions = len(self.building_files)  # Total number of building conditions
+        self.total_samples = self.num_gm_samples * self.num_building_conditions  # Total dataset size
+
+    def __len__(self):
+        return self.total_samples
+
+    def __getitem__(self, idx):
+        # Compute individual indices
+        gm_index = idx // self.num_building_conditions
+        building_index = idx % self.num_building_conditions
+        
+        # Get the ground motion data
+        with h5py.File(self.gm_file_path, 'r') as f:
+            gm_data = f['Acc_GMs'][gm_index]
+
+        # output [3000, 1]
+        gm_data = torch.from_numpy(gm_data).float().unsqueeze(-1)
+
+        # Get a specific building file based on the building index
+        bldg_file = self.building_files[building_index]
+
+        # Read data for the specific building condition
+        with h5py.File(bldg_file, 'r') as f:
+            acc_floor_response = f['Acc_Floor_Response'][gm_index]
+            blg_damage_state = f['Blg_Damage_State'][gm_index][0]  # Assuming one-dimensional array
+
+            blg_attributes = {}
+            for key, dataset in f["Blg_Attributes"].items():
+                # Convert the data to a numpy
+                data = dataset[:]
+
+                # if the data type is integer
+                if dataset.dtype.kind in ['i', 'u']:
+                    tensor = torch.from_numpy(data).to(torch.int64)
+                # if the data type is float
+                elif dataset.dtype.kind == 'f':
+                    tensor = torch.from_numpy(data).to(torch.float32)
+                else:
+                    raise TypeError(f'Unknown data type: {data.dtype}')
+                
+                # Add the tensor to the dictionary and send to device
+                blg_attributes[key] = tensor.to(self.device)
+
+        # output [3000, 1]
+        acc_floor_response = torch.from_numpy(acc_floor_response).float().unsqueeze(-1)
+
+        # output [,]
+        blg_damage_state = torch.tensor([blg_damage_state], dtype=torch.long)
+
+        '''
+        gm_data: [3000, 1]
+        blg_attributes: dictionary of tensors(sent to device)
+        acc_floor_response: [3000, 1]
+        blg_damage_state: [1]
+        '''
+        return gm_data, blg_attributes, acc_floor_response, blg_damage_state
+
+# 14. custom_collate(): for SeT-4 to load huge data in dynamic way
+def custom_collate(batch):
+    gm_data_list, building_attributes_list, acc_floor_response_list, blg_damage_state_list = zip(*batch)
+
+    # Stack ground motion data, floor response data, and damage state data
+    gm_data_batch = torch.stack(gm_data_list)
+    acc_floor_response_batch = torch.stack(acc_floor_response_list)
+    blg_damage_state_batch = torch.stack(blg_damage_state_list)
+
+    # Combine building attributes into a batched format
+    batched_building_attributes = {}
+    for key in building_attributes_list[0].keys():
+        key_tensor_list = [d[key] for d in building_attributes_list]
+        # Since batch size is 1, we can directly extract the single tensor
+        # If batch size were greater than 1, we would use torch.stack(key_tensor_list)
+        batched_building_attributes[key] = key_tensor_list[0]
+
+    return gm_data_batch, batched_building_attributes, acc_floor_response_batch, blg_damage_state_batch

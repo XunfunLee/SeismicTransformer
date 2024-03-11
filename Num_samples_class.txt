@@ -1,0 +1,5 @@
+Damage State 0.0: 635411
+Damage State 1.0: 1763913
+Damage State 2.0: 1450114
+Damage State 3.0: 1082103
+Damage State 4.0: 1008999

@@ -256,6 +256,25 @@ def CreateOutputFolder(num_of_training: int,
 
     return save_dir
 
+def CreateOutputFolderV4(num_of_training: int,
+                    hidden_size: int, 
+                    num_of_layer: int,
+                    num_of_head: int, 
+                    num_of_epoch: int) -> str:
+    """ create a csv folder to store the acc and loss value and image during traning
+
+    Args:
+        all is similar to the above
+
+    Returns:    
+        save_dir: save dirctory
+    """
+    model_name = f"SeT4_{num_of_training}_HS_{hidden_size}_Layer_{num_of_layer}_Head_{num_of_head}_Epoch_{num_of_epoch}"  
+    save_dir = os.path.join("Models", "Output", model_name)
+    os.makedirs(save_dir, exist_ok=True)
+
+    return save_dir
+
 def CreateLogFile(save_dir: str) -> str:
     """ create a csv file to store the acc and loss value during traning
 
@@ -507,3 +526,70 @@ def TestModelWithExampleGM(file_path: str,
     SaveAttnHeatMapBarChart(model=model,
                             save_dir=save_dir)
     ### ------------------------------------------------------------------------------------------------ ###
+
+# save model V4
+def SaveModelV4(model: torch.nn.Module,
+              num_of_training: int,
+              hidden_size: int,
+              num_of_layer: int,
+              num_of_head: int,
+              num_of_epoch: int,
+              validation_acc: float,
+              validation_mse: float,
+              save_mode: str):
+    """ save the model
+
+    Args:
+        model: target model you want to save
+        hidden_size: size of the embedding size
+        num_of_layer: number of the transformer layer
+        num_of_head: number of head the multi-head attention
+        num_of_epoch: number of train epoch
+        validation_acc: accuracy of classification task
+        validation_mse: mse of regression task
+        save_mode: save the model or parameters only or both, "model" or "params" or "both"
+    """
+    # turn model into eval() mode
+    # model.eval()
+
+    # define the model file name
+    file_path = Path("Models")
+    # make a dirctory if it is not exist
+    file_path.mkdir(parents=True, exist_ok=True)
+
+    # just save in 2 double and the last value of the list
+    validation_acc = round(float(validation_acc[-1]), 2)
+    validation_mse = round(float(validation_mse[-1]), 2)
+    # f1_score = round(float(f1_score), 2)
+
+    num_of_training += 1
+
+    # save the entire model
+    if save_mode == "model":
+        file_name = f"SeT4_{num_of_training}_HS_{hidden_size}_Layer_{num_of_layer}_Head_{num_of_head}_Epoch_{num_of_epoch}_Acc_{validation_acc}_MSE_{validation_mse}_Model.pth"  
+        save_path = os.path.join(file_path, file_name)
+        torch.save(model, save_path)
+        print(f"Model saved to {save_path}")
+
+    # only save the params of the model
+    elif save_mode == "params":
+        file_name = f"SeT4_{num_of_training}_HS_{hidden_size}_Layer_{num_of_layer}_Head_{num_of_head}_Epoch_{num_of_epoch}_Acc_{validation_acc}_MSE_{validation_mse}_Params.pth"
+        save_path_params = os.path.join(file_path, file_name)
+        torch.save(model.state_dict(), save_path_params)
+        print(f"Model parameters saved to {save_path_params}")
+
+    elif save_mode == "both":
+        # save the model
+        model_name = f"SeT4_{num_of_training}_HS_{hidden_size}_Layer_{num_of_layer}_Head_{num_of_head}_Epoch_{num_of_epoch}_Acc_{validation_acc}_MSE_{validation_mse}_Model.pth"  
+        save_path = os.path.join(file_path, model_name)
+        torch.save(model, save_path)
+        print(f"Model saved to {save_path}")
+        # save the params
+        model_params_name = f"SeT4_{num_of_training}_HS_{hidden_size}_Layer_{num_of_layer}_Head_{num_of_head}_Epoch_{num_of_epoch}_Acc_{validation_acc}_MSE_{validation_mse}_Params.pth"
+        save_path_params = os.path.join(file_path, model_params_name)
+        torch.save(model.state_dict(), save_path_params)
+        print(f"Model parameters saved to {save_path_params}")
+
+    else:
+        raise ValueError("Invalid save_mode. Expected 'model' or 'params' or 'both")
+

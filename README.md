@@ -196,9 +196,9 @@ In conclusion, SeT-3 is a fast version to adding decoder to achieve multi-task. 
 
 ------------------------------------------------------------------
 
-### 3.4 SeismicTransformer V4.0 (working on...)
+### 3.4 SeismicTransformer V4.0 (Released)
 
-SeT-4 is a small update from SeT-3, by adding a series of multi-structure information to the model. The multi-structure information includes 4 parts: stories(1~10, 1), height(3~30, 3), IM(6~8, 1), struct type(framework only).
+SeT-4 is a small update from SeT-3, by adding a series of multi-structure information to the model. The multi-structure information includes 4 parts: stories(1-10, 1), height(3-30, 3), IM(6-8, 1), struct type(framework only).
 
 For SeT-4, focal loss is using to balance the number of each class. The model is using 132GB of data to train, approximately 6 million (5,940,540) of data. A automation method has been developed to get the training data from MDOF procedure. Dataloader has also been rewrited to load the data, as well as the embedding method. Specifically, stories and height belong to the same category, so they are using the same embedding method (`nn.Parameter()`, which used as in token embedding). IM and struct type are using the same embedding method (`nn.Embedding()`, whcih is newly method used in SeT training for type data). More details are shown in the paper.
 
@@ -232,5 +232,5 @@ Each of the training in SeT-4 cost almost a week in 3090ti-24G. The performance 
 
 ### 3.5 SeismicTransformer V3.5 (working on...)
 
-SeT-3.5 is a classification model without decoder, adding a series of multi-structure information to the model. The multi-structure information includes 4 parts: stories(1~10, 1), height(3~30, 3), IM(6~8, 1), struct type(0 or 1, for framework and frame-shear structure). Compared to SeT-2, the training data has been enlarge to approximately 6 million. Compared to SeT-4, SeT-3.5 subtract the decoder module to focus on the classification task only.
+SeT-3.5 is a classification model without decoder, adding a series of multi-structure information to the model. The multi-structure information includes 4 parts: stories(1-10, 1), height(3-30, 3), IM(6~8, 1), struct type(0 or 1, for framework and frame-shear structure). Compared to SeT-2, the training data has been enlarge to approximately 6 million. Compared to SeT-4, SeT-3.5 subtract the decoder module to focus on the classification task only.
 

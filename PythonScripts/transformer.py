@@ -1083,7 +1083,7 @@ class DecoderV1(nn.Module):
         # Set device
         self.device = device
 
-    def forward(self, output_encoder, decoder_input=None, attn_mask=None, need_weights=True, teacher_forcing_ratio=0.5):
+    def forward(self, output_encoder, decoder_input=None, attn_mask=None, need_weights=True, teacher_forcing_ratio=1.0):
 
         # Training mode
         if decoder_input is not None:
@@ -1367,3 +1367,418 @@ class SeismicTransformerV3(nn.Module):
     # output - (torch.Size([64, 14, 5]), torch.Size([64, 3000, 1]))
     
     '''
+
+
+##### ---------------------------------- SeiscmicTransformer V4.0 ---------------------------------- #####
+"""
+Author: Jason Jiang (Xunfun Lee)
+
+date: 2023.01.27
+
+V4.0 just adding structural information embedding into the model, so the main parts of the transformer architecture remains the same as SeT-3.
+For the embedding of structural info, the difference is inside:
+
+1. Input: add structural info embedding into the input of encoder
+2. STRU Embedding(SE): a new embedding block for structural info embedding
+2. Encoder: add structural info embedding into the encoder input
+
+Updated modules:
+1. Structural Info Embedding(SIE)
+2. Encoder V2
+3. Seismic Transformer V4.0
+4. Focal Loss
+
+"""
+
+# 1. Structural Info Embedding
+class StructuralInfoEmbedding(nn.Module):
+    """putting structural info into the embedding, including IM type, struct type, stories and height.
+    
+    Args:
+        IM_type (int): IM = index 0, 1, 2 for 6, 7, 8 magnitude
+        sturct_type (int): 0:RC-Frame, 1:RC-Shearwall
+        type_embedding_size (int): type embedding size
+        middle_size (int): first fc size
+        hidden_size (int): output size, the same as the SeT hidden size
+    """
+    def __init__(self,
+                 IM_type:int=3,                     # IM = 6, 7, 8
+                 sturct_type:int=2,                 # 0:RC-Frame, 1:RC-Shearwall
+                 type_embedding_size:int=5,         # type embedding size
+                 middle_size:int=128,               # middle size
+                 hidden_size:int=768):              # hidden size
+
+        super(StructuralInfoEmbedding, self).__init__()
+
+        # type embedding (IM type and struct type)
+        self.IM_type_embedding = nn.Embedding(IM_type, type_embedding_size)
+        self.struct_type_embedding = nn.Embedding(sturct_type, type_embedding_size)
+
+        # number of numeric feature (stories and height)
+        self.numeric_feature_size = 2
+
+        # combine type embedding and numeric feature
+        self.expansion_fc = nn.Sequential(
+            nn.Linear(self.numeric_feature_size + type_embedding_size * 2, middle_size),            # (2 + 5*2)=12 -> 128
+            nn.ReLU(),
+            nn.Linear(middle_size, hidden_size)                                                     # 128 -> 768
+        )
+
+    def forward(self, structural_info):
+        """
+        Args:
+            structural_info : dict
+                stories: torch.Tensor, dtype=torch.float
+                height: torch.Tensor, dtype=torch.float
+                IM_type: torch.Tensor, dtype=torch.long (64-bit integer)
+                struct_type: torch.Tensor, dtype=torch.long (64-bit integer)
+        """
+        # type embedding
+        IM_embed = self.IM_type_embedding(structural_info["IM"])
+        struct_type_embed = self.struct_type_embedding(structural_info["struct_type"])
+
+        # standardize numeric features
+        stories_normalized = (structural_info["stories"] - 5.5) / 2.9  # stories in 1-10F
+        height_normalized = (structural_info["height"] - 15.5) / 8.7  # height in 3-30m
+        numeric_features = torch.stack([stories_normalized, height_normalized], dim=1)
+
+        # combine type embedding and numeric feature
+        structuralInfo_features = torch.cat([IM_embed, struct_type_embed, numeric_features], dim=1)
+
+        # using fc to expand structural info features to 768                                        # 12 -> 768
+        structural_info_embedding = self.expansion_fc(structuralInfo_features)
+
+        return structural_info_embedding
+    
+    # test code
+    '''python
+    structural_info_embedding_model = StructuralInfoEmbedding().to(device)
+    stories_test = torch.tensor([3], dtype=torch.float).to(device)  # stories
+    height_test = torch.tensor([9], dtype=torch.float).to(device)   # height
+    IM_type_test = torch.tensor([1]).to(device)                    # IM = 7
+    struct_type_test = torch.tensor([0]).to(device)                # RC-frame
+
+    # using dict to store structural info
+    structural_info_dict = {"stories": stories_test, 
+                            "height": height_test, 
+                            "IM_type": IM_type_test, 
+                            "struct_type": struct_type_test}
+
+    structural_info_embedding_test = structural_info_embedding_model(structural_info_dict)
+
+    # structural_info_embedding_test.shape = torch.Size([1, 768])
+    '''
+
+# 2. Encoder V2
+class EncoderV2(nn.Module):
+    """EncoderV2 combined encoder block (MLP + MHA), PE, SE and SIE, block
+
+    (batch_size, 3000, 1) --> (batch_size, 14, 768)
+    
+    Args:
+        len_gm (int): Length of the ground motion. Defaults to 3000.
+        patch_size (int): Size of the patch. Defaults to 250.
+        hidden_size (int): Hidden size of the input tensor. Defaults to 768.
+        num_heads (int): Number of attention heads. Defaults to 12.
+        fc_hidden_size (int): Hidden size of the first fully connected layer. Defaults to 3072.
+        dropout_attn (float): Dropout rate. Defaults to 0.1.
+        dropout_mlp (float): Dropout rate. Defaults to 0.1.
+        dropout_embed (float): Dropout rate. Defaults to 0.1.
+    """
+
+    def __init__(self,
+                 len_gm:int=3000,
+                 patch_size:int=250,
+                 hidden_size:int=768,
+                 num_heads:int=12,
+                 num_layers:int=12,
+                 dropout_attn:float=0.1,
+                 dropout_mlp:float=0.1,
+                 dropout_embed:float=0.1):
+
+        super().__init__()
+
+        # Calculate the number of patches
+        self.num_of_patch = len_gm // patch_size
+
+        # Initialize a variable to stroe the attention weights
+        self.attention_weights_list = []  # Initialize it here
+        
+        # BLOCK
+        # patch embedding
+        self.PatchEmbedding = PatchEmbeddingBlock(len_gm=len_gm,
+                                      patch_size=patch_size,
+                                      output_size=hidden_size)
+        
+        # frequency embedding
+        self.FreqEmbedding = FreqEmbeddingBlock(conv_output_size=len_gm // 2 // 2,         # default is 750
+                                     linear_output_size=hidden_size)
+
+        # structural info embedding
+        self.StruEmbedding = StructuralInfoEmbedding(IM_type=3,                             # IM = 6, 7, 8
+                                                     sturct_type=2,                         # 0:RC-Frame, 1:RC-Shearwall
+                                                     type_embedding_size=5,                 # type embedding size
+                                                     middle_size=128,                       # first fc size
+                                                     hidden_size=hidden_size)
+
+        # encoder layer
+        self.EncoderLayers = nn.Sequential(*[EncoderBlock(hidden_size=hidden_size,
+                                                          num_heads=num_heads,
+                                                          fc_hidden_size=hidden_size*4,
+                                                          dropout_attn=dropout_attn,
+                                                          dropout_mlp=dropout_mlp) for _ in range(num_layers)])
+
+        # [TOKEN]
+        # [TIME] - time token
+        self.time_token = nn.Parameter(torch.randn(1, 1, hidden_size),
+                                       requires_grad=True)  # trainable parameter
+
+        # [FREQ] - frequency token
+        self.freq_token = nn.Parameter(torch.randn(1, 1, hidden_size),
+                                       requires_grad=True)  # trainable parameter
+        
+        # [STRU] - structural info token
+        self.stru_token = nn.Parameter(torch.randn(1, 1, hidden_size),
+                                                  requires_grad=True)
+
+        # [CLS] - class token
+        self.class_token = nn.Parameter(torch.randn(1, 1, hidden_size),
+                                        requires_grad=True)  # trainable parameter
+
+        # POSITION
+        # positional embedding
+        self.positional_embedding = nn.Parameter(torch.randn(1, self.num_of_patch+2, hidden_size),
+                                                  requires_grad=True)  # trainable parameter
+        
+        # Dropout
+        self.embedding_dropout = nn.Dropout(dropout_embed)
+
+
+    def forward(self, ground_motion, structural_info, key_padding_mask=None, need_weights=True):
+        """
+        Args:
+            ground_motion: (batch_size, 3000, 1) - dtype=torch.float
+            structural_info: (stories, height, IM_type, struct_type)
+                            - dict[torch.Tensor-dtype=float, torch.Tensor-dtype=float, torch.Tensor-dtype=long, torch.Tensor-dtype=long]
+            key_padding_mask: (batch_size, 14) - dtype=torch.bool
+            need_weights: bool
+        """
+        # Get the batch size
+        batch_size = ground_motion.shape[0]
+
+        # Structural info embedding                                                                         
+        structural_info_embedding = self.StruEmbedding(structural_info)                             # [batch_size, 1, hidden_size]
+
+        # [STRU] token
+        stru_tokens = self.stru_token.repeat(batch_size, 1, 1)
+
+        # concatenate the structural info embedding with the structural info tokens
+        stru_sequence_with_token = structural_info_embedding + stru_tokens                          # [batch_size, 1, hidden_size]
+
+        # clear the attention weights list
+        self.attention_weights_list = []
+
+        # patch embedding
+        time_sequence = self.PatchEmbedding(ground_motion)
+
+        # [TIME] token
+        time_tokens = self.time_token.repeat(batch_size, self.num_of_patch, 1)
+
+        # concatenate the time sequence with the time tokens
+        time_sequence_with_token = time_sequence + time_tokens                                      # [batch_size, 12, hidden_size]
+
+        # frequency embedding
+        freq_sequence = self.FreqEmbedding(ground_motion)
+
+        # [FREQ] token
+        freq_tokens = self.freq_token.repeat(batch_size, 1, 1)
+
+        # concatenate the frequency sequence with the frequency tokens
+        freq_sequence_with_token = freq_sequence + freq_tokens                                      # [batch_size, 1, hidden_size]
+
+        # cat the stru sequence, time sequence and the frequency sequence
+        sequence_combine = torch.cat((stru_sequence_with_token, time_sequence_with_token, freq_sequence_with_token), dim=1)   # [batch_size, 14, hidden_size]
+
+        # [CLS] token
+        class_tokens = self.class_token.expand(batch_size, -1, -1) # "-1" means to infer the dimension (try this line on its own)
+
+        # concatenate the class token with the sequence
+        sequence_combine_with_cls = torch.cat((class_tokens, sequence_combine), dim=1)              # [batch_size, 15, hidden_size]
+
+        # embedding dropout
+        x = self.embedding_dropout(sequence_combine_with_cls)
+
+        # Encoder Layer
+        for layer in self.EncoderLayers:
+            x, attn_weights = layer(x, key_padding_mask=key_padding_mask, need_weights=need_weights)
+            self.attention_weights_list.append(attn_weights)
+
+        return x
+    
+    # test code
+    '''python
+    EncoderV2_Instance = EncoderV2().to(device)
+    input_Encoder = torch.rand(64, 3000, 1).to(device)
+    output = EncoderV2_Instance(input_Encoder, structural_info_dict)
+
+    # output.shape = torch.Size([64, 15, 768])
+    '''
+
+# 3. Seismic Transformer V4.0
+class SeismicTransformerV4(nn.Module):
+    """Seismic Transformer V4.0 class, including encoder, decoder, classifier and splicer.
+    
+    Args:
+        len_gm (int): Length of the ground motion. Defaults to 3000.
+        patch_size (int): Size of the patch. Defaults to 250.
+        hidden_size (int): Hidden size of the input tensor. Defaults to 768.
+        num_heads (int): Number of attention heads. Defaults to 12.
+        num_layers (int): Number of layers. Defaults to 12.
+        dropout_attn (float): Dropout rate. Defaults to 0.1.
+        dropout_mlp (float): Dropout rate. Defaults to 0.1.
+        dropout_embed (float): Dropout rate. Defaults to 0.1.
+        num_of_classes (int): Number of classes. Defaults to 5.
+    """
+
+    def __init__(self,
+                 len_gm:int=3000,
+                 patch_size:int=250,
+                 hidden_size:int=768,
+                 num_heads:int=12,
+                 num_layers:int=12,
+                 dropout_attn:float=0.1,
+                 dropout_mlp:float=0.1,
+                 dropout_embed:float=0.1,
+                 num_of_classes:int=5):
+
+        super().__init__()
+
+        # Encoder
+        self.encoder = EncoderV2(len_gm=len_gm,
+                                 patch_size=patch_size,
+                                 hidden_size=hidden_size,
+                                 num_heads=num_heads,
+                                 num_layers=num_layers,
+                                 dropout_attn=dropout_attn,
+                                 dropout_mlp=dropout_mlp,
+                                 dropout_embed=dropout_embed)
+        
+        # Decoder
+        self.decoder = DecoderV1(len_gm=len_gm,
+                                 patch_size=patch_size,
+                                 hidden_size=hidden_size,
+                                 num_heads=num_heads,
+                                 num_layers=num_layers,
+                                 dropout_attn=dropout_attn,
+                                 dropout_mlp=dropout_mlp,
+                                 dropout_embed=dropout_embed)
+
+        # Classifier
+        self.classifier = ClassifierV1(hidden_size=hidden_size,
+                                       num_of_classes=num_of_classes)
+        
+        # Splicer
+        self.splicer = SplicerV1(hidden_size=hidden_size,
+                                 patch_size=patch_size,
+                                 len_gm=len_gm)
+        
+    def forward(self, encoder_input, struct_info, decoder_input=None, key_padding_mask=None, attn_mask=None, teacher_forcing_ratio=1.0):
+        # Encoder output
+        encoder_output = self.encoder(ground_motion=encoder_input, 
+                                      structural_info=struct_info,
+                                      key_padding_mask=key_padding_mask)
+
+        encoder_output_to_decoder = encoder_output[:,2:14,:]            # for adding structural info embedding in front of the time sequence, so change from [:,1:13,:] to [:,2:14,:]
+
+        # If target sequence is provided, we are in training mode, otherwise we are in inference mode
+        decoder_output = self.decoder(output_encoder=encoder_output_to_decoder,
+                                        decoder_input=decoder_input,
+                                        attn_mask=attn_mask,
+                                        need_weights=True,
+                                        teacher_forcing_ratio=teacher_forcing_ratio)
+            
+        dynamic_response = self.splicer(decoder_output)
+
+        # Classifier forward pass to determine the damage state
+        # damage_state is logits, put 0 index logit through classifier
+        damage_state = self.classifier(encoder_output[:, 0])
+
+        return damage_state, dynamic_response
+    
+    # test code
+    '''python
+    SeismicTransformerV4_instance = SeismicTransformerV4().to(device)
+    input_gm = torch.rand(64, 3000, 1).to(device)
+    input_floorResponse = torch.rand(64, 3000, 1).to(device)
+    struct_info = {"stories": torch.tensor([3], dtype=torch.float).to(device),
+                    "height": torch.tensor([9], dtype=torch.float).to(device),
+                    "IM_type": torch.tensor([1]).to(device),
+                    "struct_type": torch.tensor([0]).to(device)}
+
+    # key_padding_mask must be match the sequence = 15
+    key_padding_mask = torch.zeros(64, 15, dtype=torch.bool).to(device)
+    attn_mask = torch.triu(torch.ones(12, 12), diagonal=1).bool().to(device)
+
+    # training mode (with encoder input)
+    damage_state, dynamic_response = SeismicTransformerV4_instance(encoder_input=input_gm, 
+                                                                    struct_info=struct_info,
+                                                                    decoder_input=input_floorResponse, 
+                                                                    key_padding_mask=key_padding_mask, 
+                                                                    attn_mask=attn_mask)
+
+    print(damage_state.shape, dynamic_response.shape)
+    # output - (torch.Size([64, 5]), torch.Size([64, 3000, 1]))
+
+    # inference mode (without encoder input)
+    with torch.inference_mode():
+        damage_state, dynamic_response = SeismicTransformerV4_instance(encoder_input=input_gm, 
+                                                                        struct_info=struct_info,
+                                                                        decoder_input=None, 
+                                                                        key_padding_mask=key_padding_mask, 
+                                                                        attn_mask=attn_mask)
+    print(damage_state.shape, dynamic_response.shape)
+    # output - (torch.Size([64, 5]), torch.Size([64, 3000, 1]))
+    '''
+
+class FocalLoss(nn.Module):
+    """Focal Loss for multi-class classification.
+
+    1. Balance the sample distribution
+    2. Focus on hard samples
+    
+    Args:
+        weight (torch.tensor): weights for each class. Defaults to None.
+            e.g. torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5]) for 5 classes
+
+        gamma (int): focusing parameter. Defaults to 2.0.
+        reduction (str): method to reduce the loss. Defaults to 'mean'.
+    """
+    def __init__(self, 
+                 weight:torch.tensor=None, 
+                 gamma:int=2.0, 
+                 reduction:str='mean'):
+        
+        super(FocalLoss, self).__init__()
+        self.weight = weight  # weights for each class
+        self.gamma = gamma    # focusing parameter
+        self.reduction = reduction  # method to reduce the loss
+
+    def forward(self, input, target):
+        # input -> [batch_size, n_class], need logits
+        # target -> [batch_size], true label
+
+        # softmax to get the probability
+        probs = F.softmax(input, dim=1)
+
+        # get the probability of the true label
+        probs = probs.gather(1, target.unsqueeze(1)).squeeze(1)
+
+        # calculate the focal loss
+        focal_loss = -self.weight[target] * (1 - probs)**self.gamma * probs.log()
+
+        if self.reduction == 'mean':
+            return focal_loss.mean()
+        elif self.reduction == 'sum':
+            return focal_loss.sum()
+        else:
+            return focal_loss

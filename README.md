@@ -195,3 +195,40 @@ In conclusion, SeT-3 is a fast version to adding decoder to achieve multi-task. 
 ------------------------------------------------------------------
 
 ### 3.4 SeismicTransformer V4.0 (working on...)
+
+SeT-4 is a small update from SeT-3, by adding a series of multi-structure information to the model. The multi-structure information includes 4 parts: stories(1~10, 1), height(3~30, 3), IM(6~8, 1), struct type(framework only).
+
+For SeT-4, focal loss is using to balance the number of each class. The model is using 132GB of data to train, approximately 6 million (5,940,540) of data. A automation method has been developed to get the training data from MDOF procedure. Dataloader has also been rewrited to load the data, as well as the embedding method. Specifically, stories and height belong to the same category, so they are using the same embedding method (`nn.Parameter()`, which used as in token embedding). IM and struct type are using the same embedding method (`nn.Embedding()`, whcih is newly method used in SeT training for type data). More details are shown in the paper.
+
+#### 3.4.1 File Description
+
+#### `SeT_4_Cookbook.ipynb`: build SeT-4 from scratch
+
+A notebook to record the process of building SeT-4, which includes all the module used in SeT-4. All modules are rewrited for the complex structure of SeT-4.
+
+#### `SeT_4_Trainbook.ipynb`: train SeT-4
+
+A notebook to train the SeT-4 model. Including a lot of visualization of the training process.
+
+#### `set4_train.py`: script to train SeT-4
+
+#### `set4_train_factory.py`: script to train SeT-4 with different params
+
+#### `sample_counter.py`: counter the number of each class in the training data
+
+Num_samples_class.txt is the output of `sample_counter.py`, which is used to calculate the weight of each class in focal loss.
+
+#### **Python Scripts:**
+
+All the python scripts are rewrited for the complex structure of SeT-4. e.g. `SeismicTransformerV4`, `EncoderV2`...
+
+#### 3.4.2 Conclusion
+
+Each of the training in SeT-4 cost almost a week in 3090ti-24G. The performance of the model is not good enough with accuracy=66% while the MSE=0.5, you can call this bad performance :p. However, the accuracy of the model is only 66% and doesn't increase after 3 epoches. So SeT-3.5 is coming soon to solve the classification task only. After figuring out the classification task, SeT-4.1 will be back to solve the regression task with large data set. The problem maybe in the focal loss, or the whole model structure is not very good for multi-task.
+
+------------------------------------------------------------------
+
+### 3.5 SeismicTransformer V3.5 (working on...)
+
+SeT-3.5 is a classification model without decoder, adding a series of multi-structure information to the model. The multi-structure information includes 4 parts: stories(1~10, 1), height(3~30, 3), IM(6~8, 1), struct type(0 or 1, for framework and frame-shear structure). Compared to SeT-2, the training data has been enlarge to approximately 6 million. Compared to SeT-4, SeT-3.5 subtract the decoder module to focus on the classification task only.
+
